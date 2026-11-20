@@ -5,6 +5,37 @@
 
 ---
 
+## 2026-11-20 23:50 — M0.1：站点跑通（玄关 + /chat + 日志 + 服务脚本）
+
+**做到哪**
+- 读了 `回复2.md`（你写的是「回复1.md」，实际文件名是 `回复2.md`），把新增要求整理成
+  `Docs\PLAN-v0.3-ADDENDUM.md`：玄关定义、里主题（私密背景/特效/字体/图标）、Qwen 审核、
+  日志 90 天进备份、错误自诊断、命令提示器、Docs 鉴权、服务器文件沙箱、chat 多端同步方案、
+  dsh 代理站长、网盘调研结论。
+- 代码：`Main\src\Genkan.App`（ASP.NET Core 10 + Serilog），实现
+  玄关欢迎页、Extend 挂载发现、`/chat/` 静态挂载（尾斜杠重定向 + SPA 回退）、`/healthz`、`/api/extends`。
+- 前端：`Main\website\pages\home.html` + `assets\css\home.css` + `assets\js\home.js`
+  （表/里主题切换、在线状态灯、装修中提示、移动端单列）。
+- 脚本：`Tools\build.ps1`、`dev.ps1`、`install-service.ps1`、`uninstall-service.ps1`、`smoke-test.ps1`。
+- 构建成功（产物 0.7MB），冒烟测试 4/4 通过，日志落 `Main\logs\app-20261120.log`。
+
+**遇到的问题**
+1. PowerShell 执行策略禁止运行脚本（`UnauthorizedAccess`）→ 用 `-ExecutionPolicy Bypass` 运行；
+   已写进使用说明。
+2. 脚本里的中文导致 PS 5.1 解析报错：`write` 写出的是无 BOM UTF-8，PS 5.1 按 ANSI 读。
+   → 全部 `.ps1` 转成 **UTF-8 with BOM**，验证 BOM=True。
+3. `git push` 失败：本机没有 GitHub/Gitee 凭据，GCM 非交互模式无法弹窗。
+   → 需要你在自己终端里交互授权一次，之后我就能推。
+4. 沙箱下 NuGet 读 `%APPDATA%\NuGet\NuGet.Config` 被拒 → `build.ps1` 支持 `GENKAN_SANDBOX=1`
+   时重定向 APPDATA/LOCALAPPDATA。
+5. 网盘方案调研交给子 agent（cloud-backup-scout）完成 → `Docs\CLOUD-BACKUP.md`（215 行）。
+
+**下一步**
+- M0.2：SQLite + 登录 + 双端 Razor 布局 + 主题框架（表/里/中性）。
+- 等你回答 `Docs\CLOUD-BACKUP.md` 第 9 节的 4 个问题，再定网盘。
+
+---
+
 ## 2026-11-20 22:30 — v0.2 计划定稿 + 首个挂载物就位
 
 **做到哪**
