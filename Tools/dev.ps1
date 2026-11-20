@@ -1,7 +1,7 @@
 ﻿# 开发模式：前台运行，改代码热重启
 [CmdletBinding()]
 param(
-    [string]$Url = 'http://127.0.0.1:8080'
+    [string]$Url = 'http://localhost:8080'
 )
 
 $ErrorActionPreference = 'Stop'
