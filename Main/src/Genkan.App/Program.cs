@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Security.Claims;
 using Dapper;
 using Genkan;
+using Genkan.Backup;
 using Genkan.Blog;
 using Genkan.Data;
 using Genkan.Files;
@@ -78,6 +79,10 @@ builder.Services.AddSingleton<ModerationService>();
 builder.Services.AddSingleton<FileRepository>();
 builder.Services.AddSingleton<FileStorage>();
 builder.Services.AddSingleton<ShareService>();
+builder.Services.AddSingleton<SecretStore>();
+builder.Services.AddSingleton<KopiaService>();
+builder.Services.AddSingleton<BackupService>();
+builder.Services.AddHostedService<BackupScheduler>();
 builder.Services.AddHttpClient("moderation", client => client.Timeout = TimeSpan.FromSeconds(8));
 builder.Services.AddSingleton<SetupState>();
 

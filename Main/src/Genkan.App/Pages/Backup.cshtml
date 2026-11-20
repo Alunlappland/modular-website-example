@@ -1,0 +1,161 @@
+@page "/backup"
+@model Genkan.Pages.BackupModel
+@{
+    ViewData["Title"] = "备份";
+}
+<link rel="stylesheet" href="/assets/css/admin.css" />
+
+<section class="admin">
+    <header class="admin-head">
+        <div>
+            <p class="eyebrow">BACKUP · kopia</p>
+            <h1>自动备份</h1>
+        </div>
+        <p class="admin-hint">
+            每天 @Model.DailyTime.ToString(@"hh\:mm") 增量快照；距上次全量满 @Model.FullEveryDays 天时打 full 标签。
+            仓库密码用 DataProtection 加密保存在 conf 下。
+        </p>
+    </header>
+
+    @if (!string.IsNullOrEmpty(Model.Message))
+    {
+        <div class="notice">@Model.Message</div>
+    }
+    @if (!string.IsNullOrEmpty(Model.Error))
+    {
+        <div class="alert">@Model.Error</div>
+    }
+
+    <section class="admin-form" style="margin-bottom:16px">
+        <h2>状态</h2>
+        <dl class="kv">
+            <div>
+                <dt>就绪</dt>
+                <dd><span class="tag @(Model.Ready ? "on" : "off")">@Model.StatusSummary</span></dd>
+            </div>
+            <div><dt>kopia.exe</dt><dd><code>@Model.ExePath</code> @(Model.ExeExists ? "✓" : "✗")</dd></div>
+            <div><dt>仓库配置</dt><dd><code>@Model.ConfigPath</code> @(Model.ConfigExists ? "✓" : "✗")</dd></div>
+            <div><dt>仓库密码</dt><dd>@(Model.HasPassword ? "已保存（加密）" : "未保存")</dd></div>
+            <div><dt>备份源</dt><dd>@Model.Sources.Count 个目录</dd></div>
+            <div><dt>距上次全量</dt><dd>@(Model.DaysSinceFull == int.MaxValue ? "还没有全量备份" : Model.DaysSinceFull + " 天")</dd></div>
+        </dl>
+
+        @if (Model.Sources.Count > 0)
+        {
+            <ul class="backup-sources">
+                @foreach (var source in Model.Sources)
+                {
+                    <li><code>@source</code></li>
+                }
+            </ul>
+        }
+    </section>
+
+    <section class="admin-form" style="margin-bottom:16px">
+        <h2>仓库密码</h2>
+        <p class="muted small">只写不读：保存后不会在页面上显示，只能覆盖或清除。</p>
+        <form method="post" asp-page-handler="Password">
+            <div class="grid2">
+                <label class="field">
+                    <span>kopia 仓库密码</span>
+                    <input asp-for="Password" type="password" autocomplete="new-password" />
+                </label>
+            </div>
+            <button class="btn" type="submit">保存密码</button>
+        </form>
+        @if (Model.HasPassword)
+        {
+            <form method="post" asp-page-handler="Forget" style="margin-top:8px">
+                <button class="btn ghost" type="submit">清除已保存的密码</button>
+            </form>
+        }
+    </section>
+
+    <section class="admin-form" style="margin-bottom:16px">
+        <h2>立即备份</h2>
+        <div class="row">
+            <form method="post" asp-page-handler="Run">
+                <input type="hidden" name="kind" value="daily" />
+                <button class="btn" type="submit">增量快照</button>
+            </form>
+            <form method="post" asp-page-handler="Run">
+                <input type="hidden" name="kind" value="full" />
+                <button class="btn ghost" type="submit">全量恢复点（打 full 标签）</button>
+            </form>
+        </div>
+        <p class="muted small">备份在后台执行，页面会等它跑完；大目录可能慢。</p>
+    </section>
+
+    <section class="admin-form" style="margin-bottom:16px">
+        <h2>快照</h2>
+        @if (Model.Snapshots.Count == 0)
+        {
+            <p class="muted">还没有快照（或者还没配置好仓库）。</p>
+        }
+        else
+        {
+            <div class="admin-table-wrap">
+                <table class="admin-table">
+                    <thead>
+                        <tr><th>时间</th><th>来源</th><th>文件</th><th>大小</th><th>标签</th><th>ID</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var snapshot in Model.Snapshots)
+                        {
+                            <tr>
+                                <td>@(DateTimeOffset.TryParse(snapshot.StartTime, out var at) ? at.ToLocalTime().ToString("MM-dd HH:mm") : snapshot.StartTime)</td>
+                                <td class="snapshot-source" title="@snapshot.Source">@snapshot.Source</td>
+                                <td>@snapshot.Files</td>
+                                <td>@Genkan.Backup.BackupService.FormatBytes(snapshot.Bytes)</td>
+                                <td>@snapshot.Tags</td>
+                                <td><code data-snapshot="@snapshot.Id">@snapshot.Id</code></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+
+        <form method="post" asp-page-handler="Restore">
+            <div class="grid2">
+                <label class="field">
+                    <span>恢复到 staging（填快照 ID）</span>
+                    <input asp-for="SnapshotId" placeholder="kopia 快照 ID" />
+                </label>
+            </div>
+            <button class="btn ghost" type="submit">恢复到这个目录</button>
+            <p class="muted small">目标：<code>@Model.StagingPath</code>（绝不覆盖线上目录，确认后再手动合并）。</p>
+        </form>
+    </section>
+
+    <section class="admin-form">
+        <h2>历史</h2>
+        @if (Model.Runs.Count == 0)
+        {
+            <p class="muted">还没有执行记录。</p>
+        }
+        else
+        {
+            <div class="admin-table-wrap">
+                <table class="admin-table">
+                    <thead>
+                        <tr><th>时间</th><th>类型</th><th>结果</th><th>文件</th><th>大小</th><th>备注</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var run in Model.Runs)
+                        {
+                            <tr>
+                                <td>@(DateTimeOffset.TryParse(run.StartedAt, out var at) ? at.ToLocalTime().ToString("MM-dd HH:mm") : run.StartedAt)</td>
+                                <td>@run.Kind</td>
+                                <td><span class="tag @(run.State == "success" ? "on" : "off")">@run.State</span></td>
+                                <td>@(run.Files?.ToString() ?? "—")</td>
+                                <td>@(run.Bytes is null ? "—" : Genkan.Backup.BackupService.FormatBytes(run.Bytes.Value))</td>
+                                <td class="run-error" title="@run.Error">@(run.Error ?? "—")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+</section>

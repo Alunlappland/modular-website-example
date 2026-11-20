@@ -144,6 +144,21 @@ public sealed class GenkanDb
 
         CREATE UNIQUE INDEX IF NOT EXISTS ux_shares_token ON shares(token);
 
+        CREATE TABLE IF NOT EXISTS backup_runs (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            kind        TEXT NOT NULL,
+            state       TEXT NOT NULL,
+            started_at  TEXT NOT NULL,
+            ended_at    TEXT,
+            snapshot_id TEXT,
+            files       INTEGER,
+            bytes       INTEGER,
+            error       TEXT,
+            output      TEXT
+        );
+
+        CREATE INDEX IF NOT EXISTS ix_backup_started ON backup_runs(started_at);
+
         INSERT INTO settings(key, value, updated_at)
         VALUES ('schema_version', '1', datetime('now'))
         ON CONFLICT(key) DO NOTHING;

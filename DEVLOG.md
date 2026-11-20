@@ -5,6 +5,32 @@
 
 ---
 
+## 2026-11-21 04:50 — M4：kopia 备份
+
+**做到哪**
+- `/backup`（仅站长）：仓库状态、密码托管、立即备份、快照列表、恢复到 staging、执行历史。
+- 仓库密码用 **DataProtection** 加密存 `Main\conf\secrets.json`，页面只写不读，可覆盖/清除。
+- `KopiaService`：显式传 `KOPIA_CONFIG_PATH` / `KOPIA_PASSWORD` / `KOPIA_LOG_DIR` / `KOPIA_CACHE_DIRECTORY`，
+  避免服务账户（LocalSystem）与用户账户的 `%APPDATA%` 差异；kopia.exe 与仓库配置路径可配置。
+- 计划任务 `BackupScheduler`：每天 **12:00** 跑一次；距上次全量满 **10 天**时改打 `kind:full` 标签。
+  历史写 `backup_runs` 表（状态、文件数、大小、错误、输出片段）。
+- 恢复只落到 `Main\data\restore-staging\<时间戳>`，绝不覆盖线上目录。
+- 测试：`Tools\e2e-m4.ps1` **12 项全过** —— 用临时仓库（`Main\depend\tmp\kopia-test`，
+  密码 test-pass）跑增量→全量→列快照→恢复到 staging，验证文件真的落盘。
+- 测试全程用 `snapshot-data.ps1` / `restore-data.ps1` 保护你的真实数据，跑完已还原。
+
+**遇到的问题**
+1. kopia `--tags` 只接受 `key:value`，`genkan,daily` 直接报错 → 改成 `app:genkan` + `kind:daily`。
+
+**还没做**
+- 自动保留策略（删旧快照）：先只展示列表，删除留给手工，避免误删。
+- 网盘镜像：rclone 未接，等 R2 凭据（密钥桶、Access Key、Secret）。
+
+**下一步**
+- M5：Syncthing 同步（只同步 src）。
+
+---
+
 ## 2026-11-21 03:35 — 事故复盘：误删用户上传的三个文件（已修相关体验）
 
 **发生了什么**
