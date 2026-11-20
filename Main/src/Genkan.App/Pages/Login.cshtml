@@ -1,0 +1,30 @@
+@page
+@model Genkan.Pages.LoginModel
+@{
+    ViewData["Title"] = "登录";
+}
+
+<section class="panel auth">
+    <h1>登录</h1>
+    <p class="muted">欢迎回来。第一次来的话，先去初始化站点。</p>
+
+    @if (!string.IsNullOrEmpty(Model.Error))
+    {
+        <div class="alert">@Model.Error</div>
+    }
+
+    <form method="post">
+        <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+        <label class="field">
+            <span>用户名</span>
+            <input asp-for="UserName" autocomplete="username" autofocus />
+        </label>
+        <label class="field">
+            <span>密码</span>
+            <input asp-for="Password" type="password" autocomplete="current-password" />
+        </label>
+        <button class="btn" type="submit">进门</button>
+    </form>
+
+    <p class="muted small"><a href="/setup">首次使用？初始化站点</a></p>
+</section>

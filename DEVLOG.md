@@ -5,6 +5,39 @@
 
 ---
 
+## 2026-11-21 01:20 — M0.2：登录、账号、双端布局、主题、SQLite
+
+**做到哪**
+- 数据库：SQLite（`Microsoft.Data.Sqlite` 10 + `Dapper`），`users` / `audit` / `settings` 三张表，
+  启动幂等建表，WAL 模式；库文件 `Main\database\genkan.db`。
+- 认证：PBKDF2-SHA256（210,000 次）+ 随机盐；Cookie 认证 7 天滑动过期；
+  登录失败同 IP+账号 5 次锁 5 分钟；`genkan.auth` Cookie（HttpOnly、SameSite=Lax、随请求协议决定 Secure）。
+- 首次启动强制进 `/setup` 建管理员（用户名格式/密码长度/二次确认校验），建完自动登录。
+- 页面：`/`（玄关）、`/login`、`/setup`、`/me`、`/logout`。
+- 双端布局：桌面 = 右侧固定竖导航；手机 = 顶部标题栏 + 底部标签栏（同一套 Layout，CSS 断点切换，含安全区内边距）。
+- 主题：表 / 里 / 中性三套令牌，`/theme` 写 Cookie 记一年；「里」的紫调已生效。
+- 权限：`Permissions` 角色表（admin/member/guest）；`/chat/` 按 `chat.use` 拦截——未登录跳登录，无权限 403。
+- 测试：新增 `Tools\e2e-test.ps1`，**21 项全部通过**（初始化→登录→权限→主题→退出→错误密码→重新登录）；
+  `smoke-test.ps1` 改为兼容 302，5 项通过。
+- 实测空闲内存 **74MB**（目标 <150MB），产物 33.3MB（含 SQLite 原生库）。
+
+**遇到的问题 / 解决**
+1. Dapper + `record` 材质化失败：`MatchNamesWithUnderscores` 只映射属性，不映射 record 构造参数名
+   （报 `pwd_algo` 之类签名不匹配）→ `UserRecord` 改为可写类 + 无参构造。
+2. Razor Pages 全部 404，日志 `No action descriptors found`：运行时把 `RootDirectory` 改成
+   `/Main/src/Genkan.App/Pages`，与编译期页面路径 `/Pages/...` 对不上 → 去掉覆盖，用默认根目录。
+3. 中文全部输出成 `&#x6D4B;`：Razor 默认编码器只放行 Basic Latin →
+   配置 `WebEncoderOptions.TextEncoderSettings = UnicodeRanges.All`。
+4. `dotnet publish` 报错但看不到原因：正在运行的 `Genkan.exe` 占用了输出文件 → 先停进程再构建。
+5. PowerShell 变量 `$home` 与只读 `$HOME` 冲突 → 改名 `$homePage`。
+6. `Microsoft.Data.Sqlite` 带的 `SQLitePCLRaw.lib.e_sqlite3` 2.1.11 有高危漏洞公告
+   （GHSA-2m69-gcr7-jv3q）→ 显式引用 2.1.14，重新构建后无告警。
+
+**下一步**
+- M1：`/admin/routes` 路由与挂载管理（仅本机）、Windows 风格仪表盘（CPU/内存/磁盘/进程/服务）。
+
+---
+
 ## 2026-11-21 00:35 — 推送改用 SSH；网盘定为 R2
 
 **做到哪**

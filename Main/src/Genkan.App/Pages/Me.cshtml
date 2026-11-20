@@ -1,0 +1,31 @@
+@page
+@model Genkan.Pages.MeModel
+@{
+    ViewData["Title"] = "我的";
+}
+
+<section class="panel">
+    <p class="eyebrow">ACCOUNT</p>
+    <h1>@(Model.Me?.Display ?? "我")</h1>
+    <p class="muted">@(Model.Me?.Name) · @(Model.Me?.Role)</p>
+
+    <dl class="kv">
+        <div>
+            <dt>账号创建</dt>
+            <dd>@Model.CreatedText</dd>
+        </div>
+        <div>
+            <dt>上次登录</dt>
+            <dd>@Model.LastLoginText</dd>
+        </div>
+    </dl>
+
+    <div class="row">
+        <a class="btn ghost" href="/">回玄关</a>
+        <form method="post" asp-page="/Logout">
+            <button class="btn ghost" type="submit">退出登录</button>
+        </form>
+    </div>
+
+    <p class="muted small">提权、二次验证、设备管理会在 M6 接上。</p>
+</section>

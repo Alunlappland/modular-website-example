@@ -1,4 +1,4 @@
-﻿# 冒烟测试：健康检查 + 首页 + 挂载物（用原始 TCP，避免依赖 curl）
+﻿# 冒烟测试：健康检查 + 静态资源 + 挂载（原始 TCP，不依赖 curl）
 [CmdletBinding()]
 param(
     [string]$BaseUrl = 'http://127.0.0.1:8080'
@@ -23,11 +23,13 @@ function Invoke-RawGet {
     return $text
 }
 
+# Expect 支持正则，例如 '200' 或 '200|302'
 $tests = @(
     @{ Name = '健康检查'; Path = '/healthz'; Expect = '200' },
-    @{ Name = '玄关首页'; Path = '/'; Expect = '200' },
-    @{ Name = '对话挂载'; Path = '/chat/'; Expect = '200' },
-    @{ Name = '对话静态资源'; Path = '/chat/static/css/main.27198ffe.css'; Expect = '200' }
+    @{ Name = '玄关首页'; Path = '/'; Expect = '200|302' },
+    @{ Name = '基础样式'; Path = '/assets/css/base.css'; Expect = '200' },
+    @{ Name = '对话挂载'; Path = '/chat/'; Expect = '200|302' },
+    @{ Name = '对话静态资源'; Path = '/chat/static/css/main.27198ffe.css'; Expect = '200|302' }
 )
 
 $failed = 0
@@ -36,15 +38,15 @@ foreach ($t in $tests) {
         $resp = Invoke-RawGet -Path $t.Path
         $status = ($resp -split "`r`n")[0]
         if ($status -match $t.Expect) {
-            Write-Host ("  ✓ {0,-12} {1,-34} {2}" -f $t.Name, $t.Path, $status) -ForegroundColor Green
+            Write-Host ("  ✓ {0,-14} {1,-38} {2}" -f $t.Name, $t.Path, $status) -ForegroundColor Green
         }
         else {
-            Write-Host ("  ✗ {0,-12} {1,-34} {2}" -f $t.Name, $t.Path, $status) -ForegroundColor Red
+            Write-Host ("  ✗ {0,-14} {1,-38} {2}" -f $t.Name, $t.Path, $status) -ForegroundColor Red
             $failed++
         }
     }
     catch {
-        Write-Host ("  ✗ {0,-12} {1,-34} {2}" -f $t.Name, $t.Path, $_.Exception.Message) -ForegroundColor Red
+        Write-Host ("  ✗ {0,-14} {1,-38} {2}" -f $t.Name, $t.Path, $_.Exception.Message) -ForegroundColor Red
         $failed++
     }
 }

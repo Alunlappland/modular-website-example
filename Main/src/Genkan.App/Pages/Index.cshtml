@@ -1,0 +1,63 @@
+@page
+@model Genkan.Pages.IndexModel
+@{
+    ViewData["Title"] = "玄关";
+}
+<link rel="stylesheet" href="/assets/css/home.css" />
+
+<section class="home">
+    <div class="hall">
+        <p class="eyebrow">GENKAN · 玄关</p>
+        <h1 class="site-name">情绪流形的小屋<span class="kao">o(*￣▽￣*)ブ</span></h1>
+        <p class="tagline">推门进来，屋里还乱着。</p>
+
+        <nav class="entries" aria-label="门户入口">
+            <a class="entry entry-warm" href="/chat/">
+                <span class="entry-icon" aria-hidden="true">✳</span>
+                <span class="entry-body">
+                    <span class="entry-title">对话</span>
+                    <span class="entry-desc">DeepSeek 前端，自备 API Key</span>
+                </span>
+                <span class="entry-mark">→</span>
+            </a>
+
+            <a class="entry" href="/blog" data-soon="1">
+                <span class="entry-icon" aria-hidden="true">✎</span>
+                <span class="entry-body">
+                    <span class="entry-title">博客 <em>装修中</em></span>
+                    <span class="entry-desc">随手写的东西，访客可读</span>
+                </span>
+                <span class="entry-mark">→</span>
+            </a>
+
+            <a class="entry" href="/files" data-soon="1">
+                <span class="entry-icon" aria-hidden="true">⇅</span>
+                <span class="entry-body">
+                    <span class="entry-title">文件 <em>装修中</em></span>
+                    <span class="entry-desc">收发、分享、服务器文件</span>
+                </span>
+                <span class="entry-mark">→</span>
+            </a>
+
+            <a class="entry" href="/about" data-soon="1">
+                <span class="entry-icon" aria-hidden="true">☾</span>
+                <span class="entry-body">
+                    <span class="entry-title">关于 <em>装修中</em></span>
+                    <span class="entry-desc">这屋子是怎么搭起来的</span>
+                </span>
+                <span class="entry-mark">→</span>
+            </a>
+        </nav>
+
+        <p class="hint" id="hint">
+            @if (Model.Authed)
+            {
+                <text>你已进门，@Model.Display。有些房间还在装修。</text>
+            }
+            else
+            {
+                <text>有些房间还在装修，门牌先挂着。</text>
+            }
+        </p>
+    </div>
+</section>

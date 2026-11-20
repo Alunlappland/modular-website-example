@@ -1,0 +1,37 @@
+@page
+@model Genkan.Pages.SetupModel
+@{
+    ViewData["Title"] = "初始化";
+}
+
+<section class="panel auth">
+    <h1>初始化玄关</h1>
+    <p class="muted">这是第一次开门。创建一个管理员账号，之后所有房间都由它管理。</p>
+
+    @if (!string.IsNullOrEmpty(Model.Error))
+    {
+        <div class="alert">@Model.Error</div>
+    }
+
+    <form method="post">
+        <label class="field">
+            <span>显示名</span>
+            <input asp-for="Display" autocomplete="nickname" />
+        </label>
+        <label class="field">
+            <span>用户名</span>
+            <input asp-for="UserName" autocomplete="username" />
+        </label>
+        <label class="field">
+            <span>密码（至少 10 位）</span>
+            <input asp-for="Password" type="password" autocomplete="new-password" />
+        </label>
+        <label class="field">
+            <span>再输一次</span>
+            <input asp-for="Confirm" type="password" autocomplete="new-password" />
+        </label>
+        <button class="btn" type="submit">建好，开门</button>
+    </form>
+
+    <p class="muted small">站点初始化后，这个页面会自动关闭。</p>
+</section>
