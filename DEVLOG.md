@@ -5,6 +5,31 @@
 
 ---
 
+## 2026-11-21 00:35 — 推送改用 SSH；网盘定为 R2
+
+**做到哪**
+- 你两台机器的推送都失败，定位如下：
+  - GitHub：`Empty reply from server` —— 直连 443 被干扰，不是账号问题。
+  - Gitee：`Incorrect username or password (access token)` —— Gitee 不接受账户密码，只认私人令牌。
+  - 第二次运行卡住：停在 GitHub 那一步等凭据弹窗（非交互环境下等不到）。
+- 方案改为 **SSH**：生成 ed25519 密钥 `C:\Users\manifld\.ssh\genkan_ed25519`（无口令），
+  `~/.ssh/config` 里把 `github.com` 指到 `ssh.github.com:443`（绕开干扰），Gitee 走 22。
+  远端已改为 `git@github.com:...` / `git@gitee.com:...`。
+- 连通性已验证：两个 SSH 端点都能建立连接，当前返回 `Permission denied (publickey)` —— 只差把公钥加进账号。
+- 读了 `回复3.md`：网盘决定 **先用 Cloudflare R2 试水**；站点约 1GB，落在 10GB 免费额度内；
+  个人数据几十 GB 暂不上云。已写入 `Docs/CLOUD-BACKUP.md` 第 0 节与 v0.3 增补第 11 节。
+- 运维窗口记录：学校供电/网络 24h；12:00 与 18:00 后通常有人 —— 备份仍定 12:00。
+
+**遇到的问题 / 解决**
+- SSH 公钥需要你在 GitHub、Gitee 各粘贴一次（一次性动作），之后推送不再需要密码或令牌。
+- Cloudflare R2 的账单需要可用的国际支付方式（Visa/Mastercard），银联单币卡可能绑不上，需实测。
+
+**下一步**
+- 你加完公钥 → 跑 `Tools\push.ps1` → 我确认远端同步。
+- 我继续 M0.2：SQLite + 登录 + 双端布局 + 主题框架。
+
+---
+
 ## 2026-11-20 23:50 — M0.1：站点跑通（玄关 + /chat + 日志 + 服务脚本）
 
 **做到哪**

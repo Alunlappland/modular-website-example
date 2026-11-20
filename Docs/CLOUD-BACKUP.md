@@ -6,6 +6,20 @@
 
 ---
 
+## 0. 决定（2026-11-21，用户拍板）
+
+**先用 Cloudflare R2 试水。**
+
+| 项 | 结论 |
+|---|---|
+| 镜像范围 | 只镜像站点相关数据（`Main\src`、`document`、`depend`、`website`、`data`、`database`、`conf`、`logs` + `Extend\*` 清单），当前约 **1GB** |
+| 免费额度是否够 | R2 免费 **10GB 存储** + 100 万次 A 类请求/月 + **零出站流量费**；1GB 站点 + 多版本余量充足 |
+| 个人数据（几十 GB） | **不要塞进免费额度**。若以后也要上云，按 $0.015/GB·月 估算，50GB ≈ $0.75/月；更现实的做法是只备份站点，个人大文件走本地/移动硬盘 |
+| 前置条件 | ① 已有 Cloudflare 账号（隧道在跑）② **可用的国际支付方式**：Cloudflare 账单要 Visa/Mastercard 等，单币种银联卡可能绑不上，PayPal 在部分地区可用，**需实测** |
+| 落地参数 | 照第 8 节流程，把 COS 换成 R2：`rclone config` → `s3` → provider=`Cloudflare` → endpoint=`https://<accountid>.r2.cloudflarestorage.com` → region=`auto` |
+
+> 你有长期机场账号，配置 R2 控制台时用得上；但**日常备份流量别走机场**（大流量费机场额度），R2 本身免出站费，直连即可。
+
 ## 1. 一句话结论
 
 | | 方案 | 为什么 |
