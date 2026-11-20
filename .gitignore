@@ -41,3 +41,7 @@ Main/depend/openssh/*.zip
 
 # 测试快照
 Main/depend/snapshots/
+
+# kopia 运行时缓存与日志
+Main/depend/kopia-cache/
+Main/logs/kopia/
