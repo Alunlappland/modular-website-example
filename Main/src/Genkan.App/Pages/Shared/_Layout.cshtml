@@ -20,7 +20,11 @@
         ("/chat/", "对话", "✳"),
         ("/blog", "博客", "✎"),
         ("/files", "文件", "⇅"),
-        ("/about", "关于", "☾"),
+    };
+
+    var soonItems = new (string Label, string Glyph)[]
+    {
+        ("关于", "☾"),
     };
 }
 <!doctype html>
@@ -68,6 +72,12 @@
                     <a class="snav-link @Active(item.Path)" href="@item.Path">
                         <span class="glyph">@item.Glyph</span><span>@item.Label</span>
                     </a>
+                }
+                @foreach (var item in soonItems)
+                {
+                    <span class="snav-link is-soon" title="装修中">
+                        <span class="glyph">@item.Glyph</span><span>@item.Label</span>
+                    </span>
                 }
                 @if (authed)
                 {

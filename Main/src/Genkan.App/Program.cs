@@ -4,10 +4,12 @@ using Dapper;
 using Genkan;
 using Genkan.Blog;
 using Genkan.Data;
+using Genkan.Files;
 using Genkan.Security;
 using Genkan.Sys;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -73,8 +75,15 @@ builder.Services.AddSingleton<SysMonitor>();
 builder.Services.AddSingleton<BlogService>();
 builder.Services.AddSingleton<BlogRepository>();
 builder.Services.AddSingleton<ModerationService>();
+builder.Services.AddSingleton<FileRepository>();
+builder.Services.AddSingleton<FileStorage>();
+builder.Services.AddSingleton<ShareService>();
 builder.Services.AddHttpClient("moderation", client => client.Timeout = TimeSpan.FromSeconds(8));
 builder.Services.AddSingleton<SetupState>();
+
+// 大文件上传：放宽请求体与 multipart 限制（512MB）
+builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 512L * 1024 * 1024);
+builder.Services.Configure<FormOptions>(options => options.MultipartBodyLengthLimit = 512L * 1024 * 1024);
 builder.Services.AddScoped<UserRepository>();
 builder.Services.AddScoped<AuditLog>();
 
@@ -400,6 +409,17 @@ app.MapPost("/api/blog/{slug}/annotations", async (
     if (body.Length is < 1 or > 500)
     {
         return Results.BadRequest("注释要 1–500 个字。");
+    }
+
+    if (!RateLimiter.TryAcquire(RateLimiter.ClientKey(context, "annotation"), 6, TimeSpan.FromMinutes(5)))
+    {
+        return Results.Json(new { error = "提交太频繁，歇一会儿再试。" }, statusCode: StatusCodes.Status429TooManyRequests);
+    }
+
+    var duplicate = repository.FindRecentDuplicate(slug, request.BlockIndex, author, body);
+    if (duplicate is not null)
+    {
+        return Results.Json(new { id = duplicate, status = "duplicate" });
     }
 
     var status = context.User.Identity?.IsAuthenticated == true

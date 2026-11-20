@@ -115,6 +115,35 @@ public sealed class GenkanDb
 
         CREATE UNIQUE INDEX IF NOT EXISTS ux_reactions ON reactions(post_slug, kind, fingerprint);
 
+        CREATE TABLE IF NOT EXISTS files (
+            id         TEXT PRIMARY KEY,
+            owner      TEXT NOT NULL,
+            name       TEXT NOT NULL,
+            rel_path   TEXT NOT NULL,
+            size       INTEGER NOT NULL,
+            sha256     TEXT,
+            mime       TEXT,
+            created_at TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS ix_files_owner ON files(owner, created_at);
+
+        CREATE TABLE IF NOT EXISTS shares (
+            id            TEXT PRIMARY KEY,
+            owner         TEXT NOT NULL,
+            kind          TEXT NOT NULL,
+            file_id       TEXT,
+            token         TEXT NOT NULL,
+            password_hash TEXT,
+            expires_at    TEXT,
+            max_downloads INTEGER,
+            downloads     INTEGER NOT NULL DEFAULT 0,
+            dir           TEXT,
+            created_at    TEXT NOT NULL
+        );
+
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_shares_token ON shares(token);
+
         INSERT INTO settings(key, value, updated_at)
         VALUES ('schema_version', '1', datetime('now'))
         ON CONFLICT(key) DO NOTHING;

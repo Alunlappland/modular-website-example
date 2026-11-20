@@ -1,0 +1,70 @@
+@page "/files/server"
+@model Genkan.Pages.Files.ServerModel
+@{
+    ViewData["Title"] = "服务器文件";
+}
+<link rel="stylesheet" href="/assets/css/files.css" />
+
+<section class="files">
+    <header class="files-head">
+        <div>
+            <p class="eyebrow">SERVER FILES · 只读</p>
+            <h1>服务器文件</h1>
+        </div>
+        <p class="files-hint">只读浏览白名单目录，不能上传、改名或删除。路径已在服务端做越界检查。</p>
+    </header>
+
+    @if (!string.IsNullOrEmpty(Model.Error))
+    {
+        <div class="alert">@Model.Error</div>
+    }
+
+    <section class="panel">
+        <div class="panel-head">
+            <span>
+                @Model.RootLabel
+                @if (!string.IsNullOrEmpty(Model.RelativePath))
+                {
+                    <span class="muted"> / @Model.RelativePath</span>
+                }
+            </span>
+            @if (!string.IsNullOrEmpty(Model.RelativePath))
+            {
+                <a class="link" href="/files/server?root=@Model.RootIndex&path=@System.Net.WebUtility.UrlEncode(Model.ParentPath)">← 上一级</a>
+            }
+        </div>
+
+        <table class="file-table">
+            <thead><tr><th>名称</th><th>大小</th><th>操作</th></tr></thead>
+            <tbody>
+                @foreach (var entry in Model.Entries)
+                {
+                    <tr>
+                        <td class="name">
+                            @if (entry.IsDirectory)
+                            {
+                                <a class="link" href="/files/server?root=@Model.RootIndex&path=@System.Net.WebUtility.UrlEncode(entry.Relative)">@entry.Name/</a>
+                            }
+                            else
+                            {
+                                @entry.Name
+                            }
+                        </td>
+                        <td>@(entry.IsDirectory ? "—" : (entry.Size / 1024.0).ToString("F1") + " KB")</td>
+                        <td class="ops">
+                            @if (!entry.IsDirectory)
+                            {
+                                <a class="link" href="/files/server?handler=Download&root=@Model.RootIndex&path=@System.Net.WebUtility.UrlEncode(entry.Relative)">下载</a>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        @if (Model.Entries.Count == 0 && string.IsNullOrEmpty(Model.Error))
+        {
+            <p class="muted">这个目录是空的。</p>
+        }
+    </section>
+</section>

@@ -1,0 +1,142 @@
+@page "/files"
+@model Genkan.Pages.Files.IndexModel
+@{
+    ViewData["Title"] = "文件";
+}
+<link rel="stylesheet" href="/assets/css/files.css" />
+
+<section class="files">
+    <header class="files-head">
+        <div>
+            <p class="eyebrow">FILES</p>
+            <h1>文件收发</h1>
+        </div>
+        <p class="files-hint">单文件最大 512MB；分享链接可设有效期、提取码与下载次数。大文件建议走内网直连。</p>
+    </header>
+
+    @if (!string.IsNullOrEmpty(Model.Message))
+    {
+        <div class="notice">@Model.Message</div>
+    }
+    @if (!string.IsNullOrEmpty(Model.Error))
+    {
+        <div class="alert">@Model.Error</div>
+    }
+    @if (!string.IsNullOrEmpty(Model.NewLink))
+    {
+        <div class="share-link">
+            <span>新链接：</span>
+            <code id="new-link">@Model.NewLink</code>
+            <button class="link" type="button" id="copy-link">复制</button>
+        </div>
+    }
+
+    <section class="panel dropzone" id="dropzone">
+        <form method="post" enctype="multipart/form-data" asp-page-handler="Upload" id="upload-form">
+            <input type="file" name="Upload" id="upload-input" />
+            <div class="dropzone-text">
+                <strong>把文件拖进来</strong>
+                <span>或者点上面的按钮选文件</span>
+            </div>
+            <button class="btn" type="submit">上传</button>
+        </form>
+    </section>
+
+    <section class="panel">
+        <div class="panel-head">
+            <span>我的文件（@Model.Files.Count）</span>
+            <span class="muted small">下载走 Range，断点续传可用</span>
+        </div>
+
+        @if (Model.Files.Count == 0)
+        {
+            <p class="muted">还没有文件。</p>
+        }
+        else
+        {
+            <table class="file-table">
+                <thead>
+                    <tr><th>名称</th><th>大小</th><th>时间</th><th>操作</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var file in Model.Files)
+                    {
+                        <tr>
+                            <td class="name" title="@file.Name">@file.Name</td>
+                            <td>@((file.Size / 1024.0 / 1024).ToString("F2")) MB</td>
+                            <td>@(DateTimeOffset.TryParse(file.CreatedAt, out var at) ? at.ToLocalTime().ToString("MM-dd HH:mm") : file.CreatedAt)</td>
+                            <td class="ops">
+                                <a class="link" href="/files?handler=Download&id=@file.Id">下载</a>
+                                <form method="post" asp-page-handler="Share">
+                                    <input type="hidden" name="id" value="@file.Id" />
+                                    <button class="link" type="submit">分享</button>
+                                </form>
+                                <form method="post" asp-page-handler="Delete" onsubmit="return confirm('删除这个文件？');">
+                                    <input type="hidden" name="id" value="@file.Id" />
+                                    <button class="link danger" type="submit">删除</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </section>
+
+    <section class="panel">
+        <div class="panel-head"><span>分享设置（生成链接时使用）</span></div>
+        <div class="share-options">
+            <label class="field">
+                <span>有效期（天，留空 = 长期）</span>
+                <input asp-for="ShareDays" type="number" min="1" max="365" />
+            </label>
+            <label class="field">
+                <span>提取码（可选）</span>
+                <input asp-for="SharePassword" />
+            </label>
+            <label class="field">
+                <span>下载次数上限（可选）</span>
+                <input asp-for="MaxDownloads" type="number" min="1" />
+            </label>
+            <form method="post" asp-page-handler="Drop">
+                <button class="btn ghost" type="submit">生成收件箱（只收不看）</button>
+            </form>
+        </div>
+    </section>
+
+    <section class="panel">
+        <div class="panel-head"><span>分享与收件箱（@Model.Shares.Count）</span></div>
+
+        @if (Model.Shares.Count == 0)
+        {
+            <p class="muted">还没有分享链接。</p>
+        }
+        else
+        {
+            <table class="file-table">
+                <thead>
+                    <tr><th>类型</th><th>链接</th><th>状态</th><th>操作</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var share in Model.Shares)
+                    {
+                        var path = (share.Kind == "drop" ? "/d/" : "/s/") + share.Token;
+                        <tr>
+                            <td>@(share.Kind == "drop" ? "收件箱" : "分享")</td>
+                            <td><a class="link" href="@path" target="_blank" rel="noreferrer">@path</a></td>
+                            <td>@Genkan.Files.ShareService.Describe(share)</td>
+                            <td class="ops">
+                                <form method="post" asp-page-handler="Revoke">
+                                    <input type="hidden" name="id" value="@share.Id" />
+                                    <button class="link danger" type="submit">撤销</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </section>
+</section>
+
+<script src="/assets/js/files.js"></script>

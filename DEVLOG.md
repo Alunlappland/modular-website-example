@@ -5,6 +5,35 @@
 
 ---
 
+## 2026-11-21 03:05 — 博客修补 + M3 文件收发
+
+**博客修补（你测出来的问题）**
+- 侧栏「文件 / 关于」原来是死链，点进去 404 → 未完成的项改成不可点的「装修中」占位。
+- 同一条行级注释连发 3 条（你那条「注入攻击 / 缓冲区」）→ 加 10 分钟去重 + 每 IP 5 分钟 6 次限流。
+- 评论时间显示成 `2026-11-20T18:46:05.3957453+00:00` → 统一格式化为本地 `yyyy-MM-dd HH:mm`。
+- 注释按钮永远显示「＋0」→ 没有注释时只显示「＋」。
+- 站长无法清理评论/注释 → 每条都加了「删」，待审注释也加了「通过」。
+- 文章页加了「← 回博客」。
+
+**M3 文件收发**
+- `/files`：上传（单文件 512MB，Kestrel/multipart 上限已放宽）、列表、下载（`PhysicalFileResult` + Range 断点续传）、删除。
+- 分享链接 `/s/{token}`：有效期、提取码（PBKDF2）、下载次数上限，过期/超限自动失效。
+- 收件箱 `/d/{token}`：只收不看，落盘目录名 = `sha256(随机盐+时间)` 前 32 位 —— 按你的要求用哈希做目录名。
+- 服务器文件 `/files/server`：只读浏览 `conf/appsettings.json` 里 `files:roots` 白名单（默认 Documents、Downloads），逐段做路径越界检查，路径穿越会抛错。
+- 文件元数据进 SQLite（`files` / `shares` 表），Cookie 指纹不需要，下载走文件 ID。
+- 测试：`Tools\e2e-m3.ps1` **19 项全部通过**（上传→下载一致性→分享→访客下载→收件箱哈希目录→投递落盘→服务器浏览→删除）。
+
+**遇到的问题**
+1. `PageModel.File(...)` 没有 `enableRangeProcessing` 参数 → 改用 `PhysicalFileResult { EnableRangeProcessing = true }`。
+2. `ShareModel` 的属性 `File` 与方法 `File()` 冲突 → 改名 `FileItem`。
+3. PowerShell 里 `"$sharePath?handler=Download"` 会把 `?handler` 当成变量名的一部分 → 用 `${sharePath}?handler=...`。
+4. 测试要清库但又不能丢你的数据 → 先备份 `Main\database`，跑完测试再还原；测试产生的 `data\files`、`data\inbox` 一并清掉。
+
+**下一步**
+- M4：kopia 备份（每日 12:00 快照、每 10 天全量恢复点、留 6 份、rclone 镜像到 R2）。
+
+---
+
 ## 2026-11-21 02:45 — M2：博客（Markdown、只读访客、反应、行级注释、评论审核）
 
 **做到哪**

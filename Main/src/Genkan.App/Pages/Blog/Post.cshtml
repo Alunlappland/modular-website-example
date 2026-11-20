@@ -5,10 +5,15 @@
     ViewData["Title"] = Model.Post.Title;
     var csrf = Antiforgery.GetAndStoreTokens(HttpContext).RequestToken;
 }
+@functions {
+    static string When(string? iso)
+        => DateTimeOffset.TryParse(iso, out var value) ? value.ToLocalTime().ToString("yyyy-MM-dd HH:mm") : (iso ?? "");
+}
 <meta name="csrf" content="@csrf" />
 <link rel="stylesheet" href="/assets/css/blog.css" />
 
 <article class="post" data-slug="@Model.Post.Slug">
+    <a class="back" href="/blog">← 回博客</a>
     <header class="post-head">
         <p class="eyebrow">@Model.Post.Date.ToLocalTime().ToString("yyyy-MM-dd")</p>
         <h1>@Model.Post.Title</h1>
@@ -34,7 +39,7 @@
             var items = Model.Annotations.TryGetValue(block.Index, out var list) ? list : null;
             <section class="md-block" data-block="@block.Index">
                 <button class="anno-btn" type="button" data-block="@block.Index" data-hash="@block.Hash"
-                        title="对这一块加注释">＋@(items is { Count: > 0 } ? items.Count : 0)</button>
+                        title="对这一块加注释">＋@(items is { Count: > 0 } ? items.Count.ToString() : "")</button>
                 <div class="md-content">@Html.Raw(block.Html)</div>
                 @if (items is not null && items.Count > 0)
                 {
@@ -43,9 +48,24 @@
                         {
                             <li class="@(item.Status == "approved" ? "" : "pending")">
                                 <b>@item.Author</b><span>@item.Body</span>
+                                <time>@When(item.CreatedAt)</time>
                                 @if (item.Status != "approved")
                                 {
                                     <em>待审</em>
+                                }
+                                @if (Model.IsAdmin)
+                                {
+                                    @if (item.Status != "approved")
+                                    {
+                                        <form method="post" asp-page-handler="ApproveAnnotation">
+                                            <input type="hidden" name="id" value="@item.Id" />
+                                            <button class="link" type="submit">通过</button>
+                                        </form>
+                                    }
+                                    <form method="post" asp-page-handler="DeleteAnnotation">
+                                        <input type="hidden" name="id" value="@item.Id" />
+                                        <button class="link danger" type="submit">删</button>
+                                    </form>
                                 }
                             </li>
                         }
@@ -74,7 +94,7 @@
                     <li class="@(comment.Status == "approved" ? "" : "pending")">
                         <div class="comment-head">
                             <b>@comment.Author</b>
-                            <time>@comment.CreatedAt</time>
+                            <time>@When(comment.CreatedAt)</time>
                             @if (Model.IsAdmin && comment.Status != "approved")
                             {
                                 <form method="post" asp-page-handler="Approve">
@@ -84,6 +104,13 @@
                                 <form method="post" asp-page-handler="Reject">
                                     <input type="hidden" name="id" value="@comment.Id" />
                                     <button class="link danger" type="submit">拒绝</button>
+                                </form>
+                            }
+                            @if (Model.IsAdmin)
+                            {
+                                <form method="post" asp-page-handler="DeleteComment">
+                                    <input type="hidden" name="id" value="@comment.Id" />
+                                    <button class="link danger" type="submit">删</button>
                                 </form>
                             }
                         </div>

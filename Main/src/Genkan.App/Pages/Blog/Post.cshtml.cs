@@ -77,6 +77,13 @@ public class PostModel : PageModel
             return Page();
         }
 
+        if (!RateLimiter.TryAcquire(RateLimiter.ClientKey(HttpContext, "comment"), 5, TimeSpan.FromMinutes(5)))
+        {
+            Error = "评论太频繁，歇一会儿再试。";
+            Load();
+            return Page();
+        }
+
         var status = User.Identity?.IsAuthenticated == true
             ? "approved"
             : await _moderation.ReviewAsync(author + "：" + body);
@@ -108,6 +115,42 @@ public class PostModel : PageModel
         _repository.SetCommentStatus(id, "rejected");
         _audit.Write(HttpContext, "blog.comment.reject", slug, "ok");
         return Redirect($"/blog/{slug}#comments");
+    }
+
+    public IActionResult OnPostDeleteComment(string slug, long id)
+    {
+        if (!User.IsInRole("admin"))
+        {
+            return Forbid();
+        }
+
+        _repository.DeleteComment(id);
+        _audit.Write(HttpContext, "blog.comment.delete", slug, "ok");
+        return Redirect($"/blog/{slug}#comments");
+    }
+
+    public IActionResult OnPostDeleteAnnotation(string slug, long id)
+    {
+        if (!User.IsInRole("admin"))
+        {
+            return Forbid();
+        }
+
+        _repository.DeleteAnnotation(id);
+        _audit.Write(HttpContext, "blog.annotation.delete", slug, "ok");
+        return Redirect($"/blog/{slug}");
+    }
+
+    public IActionResult OnPostApproveAnnotation(string slug, long id)
+    {
+        if (!User.IsInRole("admin"))
+        {
+            return Forbid();
+        }
+
+        _repository.SetAnnotationStatus(id, "approved");
+        _audit.Write(HttpContext, "blog.annotation.approve", slug, "ok");
+        return Redirect($"/blog/{slug}");
     }
 
     private bool CanSee(BlogPost post)

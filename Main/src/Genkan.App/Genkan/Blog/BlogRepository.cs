@@ -66,6 +66,12 @@ public sealed class BlogRepository
             new { id, status }) > 0;
     }
 
+    public bool DeleteComment(long id)
+    {
+        using var connection = _db.Open();
+        return connection.Execute("DELETE FROM comments WHERE id = @id", new { id }) > 0;
+    }
+
     // ---------- 行级注释 ----------
     public long AddAnnotation(string slug, int blockIndex, string blockHash, string author, string body, string status)
     {
@@ -95,6 +101,33 @@ public sealed class BlogRepository
         return connection.Execute(
             "UPDATE annotations SET status = @status WHERE id = @id",
             new { id, status }) > 0;
+    }
+
+    public bool DeleteAnnotation(long id)
+    {
+        using var connection = _db.Open();
+        return connection.Execute("DELETE FROM annotations WHERE id = @id", new { id }) > 0;
+    }
+
+    /// <summary>10 分钟内同一个人在同一块上提交同样内容，视为重复，直接返回已有记录。</summary>
+    public long? FindRecentDuplicate(string slug, int blockIndex, string author, string body)
+    {
+        using var connection = _db.Open();
+        return connection.QuerySingleOrDefault<long?>(
+            """
+            SELECT id FROM annotations
+            WHERE post_slug = @slug AND block_index = @blockIndex
+              AND author = @author AND body = @body AND created_at > @since
+            LIMIT 1
+            """,
+            new
+            {
+                slug,
+                blockIndex,
+                author,
+                body,
+                since = DateTimeOffset.UtcNow.AddMinutes(-10).ToString("O"),
+            });
     }
 
     // ---------- 反应 ----------

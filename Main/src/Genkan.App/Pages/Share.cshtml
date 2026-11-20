@@ -1,0 +1,36 @@
+@page "/s/{token}"
+@model Genkan.Pages.ShareModel
+@{
+    ViewData["Title"] = Model.FileItem?.Name ?? "分享";
+}
+<link rel="stylesheet" href="/assets/css/files.css" />
+
+<section class="panel share-page">
+    <p class="eyebrow">SHARED FILE</p>
+    <h1>@Model.FileItem?.Name</h1>
+    <p class="muted">
+        @(((Model.FileItem?.Size ?? 0) / 1024.0 / 1024).ToString("F2")) MB
+        @if (Model.Share is not null)
+        {
+            <text> · @Genkan.Files.ShareService.Describe(Model.Share)</text>
+        }
+    </p>
+
+    @if (!string.IsNullOrEmpty(Model.Error))
+    {
+        <div class="alert">@Model.Error</div>
+    }
+
+    <form method="post" asp-page-handler="Download">
+        @if (Model.NeedPassword)
+        {
+            <label class="field">
+                <span>提取码</span>
+                <input asp-for="Password" autocomplete="off" />
+            </label>
+        }
+        <button class="btn" type="submit">下载</button>
+    </form>
+
+    <p class="muted small">链接失效、达到下载上限或提取码错误时将无法下载。</p>
+</section>
