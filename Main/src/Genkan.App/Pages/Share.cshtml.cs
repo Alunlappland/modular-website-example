@@ -49,6 +49,12 @@ public class ShareModel : PageModel
         }
 
         NeedPassword = !string.IsNullOrEmpty(share.PasswordHash);
+
+        if (!_storage.Exists(FileItem))
+        {
+            Error = "文件已不在服务器上（可能已被删除），请联系分享者。";
+        }
+
         return Page();
     }
 
@@ -78,7 +84,8 @@ public class ShareModel : PageModel
         var full = _storage.FullPath(FileItem.Owner, FileItem.RelPath);
         if (!System.IO.File.Exists(full))
         {
-            return NotFound();
+            Error = "文件已不在服务器上（可能已被删除），请联系分享者。";
+            return Page();
         }
 
         _repository.IncreaseDownload(share.Id);

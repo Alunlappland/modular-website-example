@@ -71,6 +71,14 @@ public sealed class FileRepository
             new { id, owner }) > 0;
     }
 
+    public void DeleteSharesForFile(string fileId, string owner)
+    {
+        using var connection = _db.Open();
+        connection.Execute(
+            "DELETE FROM shares WHERE file_id = @fileId AND owner = @owner",
+            new { fileId, owner });
+    }
+
     // ---------- 分享 ----------
     public void AddShare(ShareRow share)
     {

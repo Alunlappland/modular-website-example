@@ -65,6 +65,18 @@ public sealed class FileStorage
         return relative;
     }
 
+    public bool Exists(FileRow file)
+    {
+        try
+        {
+            return File.Exists(FullPath(file.Owner, file.RelPath));
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     public string FullPath(string owner, string relative)
     {
         var root = Path.GetFullPath(OwnerRoot(owner)).TrimEnd(Path.DirectorySeparatorChar);

@@ -88,6 +88,31 @@ public class IndexModel : PageModel
         return Page();
     }
 
+    public bool IsMissing(FileRow file) => !_storage.Exists(file);
+
+    public IActionResult OnPostPrune()
+    {
+        var owner = OwnerId;
+        var removed = 0;
+
+        foreach (var file in _repository.ListFiles(owner))
+        {
+            if (_storage.Exists(file))
+            {
+                continue;
+            }
+
+            _repository.DeleteSharesForFile(file.Id, owner);
+            _repository.DeleteFile(file.Id, owner);
+            removed++;
+        }
+
+        _audit.Write(HttpContext, "files.prune", removed.ToString(), "ok");
+        Message = removed == 0 ? "没有需要清理的条目。" : $"已清理 {removed} 条失效记录（文件已不在磁盘上）。";
+        Load();
+        return Page();
+    }
+
     public IActionResult OnGetDownload(string id)
     {
         var file = _repository.GetFile(id);
@@ -149,8 +174,14 @@ public class IndexModel : PageModel
             return Page();
         }
 
-        var share = _shares.CreateFileShare(OwnerId, file.Id, ShareDays, MaxDownloads, SharePassword);
-        NewLink = "/s/" + share.Token;
+        if (!_storage.Exists(file))
+        {
+            Error = "文件已不在磁盘上，无法生成分享链接。";
+            Load();
+            return Page();
+        }
+
+        var share = _shares.CreateFileShare(OwnerId, file.Id, ShareDays, MaxDownloads, SharePassword);        NewLink = "/s/" + share.Token;
         _audit.Write(HttpContext, "files.share", file.Name, "ok");
         Message = "分享链接已生成。";
         Load();

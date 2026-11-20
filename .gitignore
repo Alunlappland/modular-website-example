@@ -38,3 +38,6 @@ Main/depend/openssh/*.zip
 
 # 临时诊断文件
 .probe-ssh/
+
+# 测试快照
+Main/depend/snapshots/

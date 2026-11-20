@@ -45,7 +45,11 @@
     <section class="panel">
         <div class="panel-head">
             <span>我的文件（@Model.Files.Count）</span>
-            <span class="muted small">下载走 Range，断点续传可用</span>
+            <span class="muted small">
+                <form method="post" asp-page-handler="Prune" style="display:inline">
+                    <button class="link danger" type="submit">清理失效记录</button>
+                </form>
+            </span>
         </div>
 
         @if (Model.Files.Count == 0)
@@ -62,11 +66,24 @@
                     @foreach (var file in Model.Files)
                     {
                         <tr>
-                            <td class="name" title="@file.Name">@file.Name</td>
+                            <td class="name" title="@file.Name">
+                                @file.Name
+                                @if (Model.IsMissing(file))
+                                {
+                                    <span class="tag off">缺失</span>
+                                }
+                            </td>
                             <td>@((file.Size / 1024.0 / 1024).ToString("F2")) MB</td>
                             <td>@(DateTimeOffset.TryParse(file.CreatedAt, out var at) ? at.ToLocalTime().ToString("MM-dd HH:mm") : file.CreatedAt)</td>
                             <td class="ops">
-                                <a class="link" href="/files?handler=Download&id=@file.Id">下载</a>
+                                @if (Model.IsMissing(file))
+                                {
+                                    <span class="muted small">文件已丢失</span>
+                                }
+                                else
+                                {
+                                    <a class="link" href="/files?handler=Download&id=@file.Id">下载</a>
+                                }
                                 <form method="post" asp-page-handler="Share">
                                     <input type="hidden" name="id" value="@file.Id" />
                                     <button class="link" type="submit">分享</button>
