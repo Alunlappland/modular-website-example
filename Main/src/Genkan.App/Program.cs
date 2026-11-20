@@ -446,6 +446,72 @@ app.MapPost("/api/blog/preview", async (
     return Results.Json(blog.Render(request.Markdown ?? string.Empty));
 });
 
+// 管理员审核/删除评论与注释：AJAX 调用，不产生页面历史
+app.MapPost("/api/blog/{slug}/comments/{id:long}/moderate", async (
+    string slug,
+    long id,
+    ModerateRequest request,
+    HttpContext context,
+    IAntiforgery antiforgery,
+    BlogRepository repository,
+    AuditLog audit) =>
+{
+    await antiforgery.ValidateRequestAsync(context);
+
+    if (!context.User.IsInRole("admin"))
+    {
+        return Results.Forbid();
+    }
+
+    var action = (request.Action ?? string.Empty).ToLowerInvariant();
+    var ok = action switch
+    {
+        "approve" => repository.SetCommentStatus(id, "approved"),
+        "reject" => repository.SetCommentStatus(id, "rejected"),
+        "delete" => repository.DeleteComment(id),
+        _ => false,
+    };
+
+    if (ok)
+    {
+        audit.Write(context, "blog.comment." + action, slug, "ok");
+    }
+
+    return ok ? Results.Json(new { ok = true }) : Results.NotFound();
+});
+
+app.MapPost("/api/blog/{slug}/annotations/{id:long}/moderate", async (
+    string slug,
+    long id,
+    ModerateRequest request,
+    HttpContext context,
+    IAntiforgery antiforgery,
+    BlogRepository repository,
+    AuditLog audit) =>
+{
+    await antiforgery.ValidateRequestAsync(context);
+
+    if (!context.User.IsInRole("admin"))
+    {
+        return Results.Forbid();
+    }
+
+    var action = (request.Action ?? string.Empty).ToLowerInvariant();
+    var ok = action switch
+    {
+        "approve" => repository.SetAnnotationStatus(id, "approved"),
+        "delete" => repository.DeleteAnnotation(id),
+        _ => false,
+    };
+
+    if (ok)
+    {
+        audit.Write(context, "blog.annotation." + action, slug, "ok");
+    }
+
+    return ok ? Results.Json(new { ok = true }) : Results.NotFound();
+});
+
 app.MapRazorPages();
 
 app.Lifetime.ApplicationStarted.Register(() =>

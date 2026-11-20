@@ -88,6 +88,56 @@
     });
   }
 
+  // ---- 管理员审核/删除（AJAX，不产生页面历史）----
+  document.addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-action]');
+    if (!button) return;
+
+    const container = button.closest('.mod');
+    if (!container || !slug) return;
+
+    event.preventDefault();
+
+    const kind = container.dataset.kind;
+    const id = container.dataset.id;
+    const action = button.dataset.action;
+    const base = kind === 'comment' ? 'comments' : 'annotations';
+
+    try {
+      const response = await fetch('/api/blog/' + slug + '/' + base + '/' + id + '/moderate', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ action }),
+      });
+      if (!response.ok) return;
+
+      const item = container.closest('li');
+      const block = container.closest('.md-block');
+
+      if (action === 'delete') {
+        if (item) item.remove();
+      } else {
+        if (item) item.classList.remove('pending');
+        const pending = item ? item.querySelector('em') : null;
+        if (pending) pending.remove();
+        container.querySelectorAll('[data-action="approve"], [data-action="reject"]').forEach((el) => el.remove());
+      }
+
+      if (block) {
+        const list = block.querySelector('.anno-list');
+        if (list && list.querySelectorAll('li').length === 0) list.remove();
+
+        const annoButton = block.querySelector('.anno-btn');
+        if (annoButton) {
+          const count = block.querySelectorAll('.anno-list li').length;
+          annoButton.textContent = '＋' + (count > 0 ? count : '');
+        }
+      }
+    } catch (error) {
+      /* 网络错误时保持原状 */
+    }
+  });
+
   // ---- 写作页实时预览 ----
   const textarea = document.querySelector('textarea[name="Body"]');
   const preview = document.getElementById('preview');

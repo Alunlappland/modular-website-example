@@ -132,11 +132,10 @@ Check '站长能看到待审评论' ($adminPost.Body -match '路人甲' -and $ad
 $guestPost2 = Get-Page $guest '/blog/hello-world'
 Check '访客看不到待审评论' ($guestPost2.Body -notmatch '路人甲')
 
-# 审核通过
-$approveToken = Get-Token $adminPost.Body
-$commentId = [regex]::Match($adminPost.Body, 'name="id" value="(\d+)"').Groups[1].Value
-$approved = Post-Form $admin "/blog/hello-world?handler=Approve" "id=$commentId&__RequestVerificationToken=$(Encode $approveToken)"
-Check '审核通过 302' ($approved.Status -eq 302) "$($approved.Status) $commentId"
+# 审核通过（走 AJAX 管理接口，不再产生页面历史）
+$commentId = [regex]::Match($adminPost.Body, 'data-kind="comment" data-id="(\d+)"').Groups[1].Value
+$approved = Post-Json $admin "/api/blog/hello-world/comments/$commentId/moderate" '{"action":"approve"}' $csrf
+Check '审核通过' ($approved.Status -eq 200) "$($approved.Status) $commentId"
 $guestPost3 = Get-Page $guest '/blog/hello-world'
 Check '通过后访客可见' ($guestPost3.Body -match '路人甲')
 
@@ -148,8 +147,16 @@ $guestCsrf = Get-Csrf (Get-Page $guest '/blog/hello-world').Body
 $guestAnno = Post-Json $guest '/api/blog/hello-world/annotations' '{"blockIndex":1,"blockHash":"def456","author":"路人乙","body":"访客的注释"}' $guestCsrf
 Check '访客注释进入待审' ($guestAnno.Status -eq 200 -and $guestAnno.Body -match '"status":"pending"') $guestAnno.Body
 
+$guestAnnoId = ([regex]::Match($guestAnno.Body, '"id":(\d+)')).Groups[1].Value
+$annoApprove = Post-Json $admin "/api/blog/hello-world/annotations/$guestAnnoId/moderate" '{"action":"approve"}' $csrf
+Check '注释审核通过' ($annoApprove.Status -eq 200) "$($annoApprove.Status) $guestAnnoId"
+
+$annoDelete = Post-Json $admin "/api/blog/hello-world/annotations/$guestAnnoId/moderate" '{"action":"delete"}' $csrf
+Check '注释删除' ($annoDelete.Status -eq 200) $annoDelete.Status
+
 $annoList = Get-Page $admin '/api/blog/hello-world/annotations'
 Check '注释接口返回列表' ($annoList.Status -eq 200 -and $annoList.Body -match '这一块有点意思') $annoList.Body
+Check '已删除注释不再出现' ($annoList.Body -notmatch '访客的注释') $annoList.Body
 
 # ---- 预览接口 ----
 $preview = Post-Json $admin '/api/blog/preview' '{"markdown":"## 预览标题"}' $csrf

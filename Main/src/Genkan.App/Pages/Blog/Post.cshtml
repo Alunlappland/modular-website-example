@@ -55,17 +55,13 @@
                                 }
                                 @if (Model.IsAdmin)
                                 {
-                                    @if (item.Status != "approved")
-                                    {
-                                        <form method="post" asp-page-handler="ApproveAnnotation">
-                                            <input type="hidden" name="id" value="@item.Id" />
-                                            <button class="link" type="submit">通过</button>
-                                        </form>
-                                    }
-                                    <form method="post" asp-page-handler="DeleteAnnotation">
-                                        <input type="hidden" name="id" value="@item.Id" />
-                                        <button class="link danger" type="submit">删</button>
-                                    </form>
+                                    <span class="mod" data-kind="annotation" data-id="@item.Id">
+                                        @if (item.Status != "approved")
+                                        {
+                                            <button class="link" type="button" data-action="approve">通过</button>
+                                        }
+                                        <button class="link danger" type="button" data-action="delete">删</button>
+                                    </span>
                                 }
                             </li>
                         }
@@ -95,23 +91,16 @@
                         <div class="comment-head">
                             <b>@comment.Author</b>
                             <time>@When(comment.CreatedAt)</time>
-                            @if (Model.IsAdmin && comment.Status != "approved")
-                            {
-                                <form method="post" asp-page-handler="Approve">
-                                    <input type="hidden" name="id" value="@comment.Id" />
-                                    <button class="link" type="submit">通过</button>
-                                </form>
-                                <form method="post" asp-page-handler="Reject">
-                                    <input type="hidden" name="id" value="@comment.Id" />
-                                    <button class="link danger" type="submit">拒绝</button>
-                                </form>
-                            }
                             @if (Model.IsAdmin)
                             {
-                                <form method="post" asp-page-handler="DeleteComment">
-                                    <input type="hidden" name="id" value="@comment.Id" />
-                                    <button class="link danger" type="submit">删</button>
-                                </form>
+                                <span class="mod" data-kind="comment" data-id="@comment.Id">
+                                    @if (comment.Status != "approved")
+                                    {
+                                        <button class="link" type="button" data-action="approve">通过</button>
+                                        <button class="link danger" type="button" data-action="reject">拒绝</button>
+                                    }
+                                    <button class="link danger" type="button" data-action="delete">删</button>
+                                </span>
                             }
                         </div>
                         <p>@comment.Body</p>

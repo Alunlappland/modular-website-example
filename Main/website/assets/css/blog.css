@@ -235,6 +235,8 @@
 .comment-head { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--ink-faint); margin-bottom: 6px; }
 .comment-head b { color: var(--ink); font-size: 13px; }
 .comment-head form { margin: 0; }
+.mod { display: inline-flex; align-items: center; gap: 8px; }
+.comment-head .mod { margin-left: auto; }
 .comment-list li p { margin: 0; font-size: 13.5px; line-height: 1.7; white-space: pre-wrap; }
 
 .comment-form { display: grid; gap: 10px; max-width: 520px; }
