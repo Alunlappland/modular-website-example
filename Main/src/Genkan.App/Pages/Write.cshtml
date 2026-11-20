@@ -1,0 +1,73 @@
+@page "/write/{slug?}"
+@model Genkan.Pages.WriteModel
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@{
+    ViewData["Title"] = Model.IsEdit ? "编辑文章" : "写一篇";
+    var csrf = Antiforgery.GetAndStoreTokens(HttpContext).RequestToken;
+}
+<meta name="csrf" content="@csrf" />
+<link rel="stylesheet" href="/assets/css/blog.css" />
+
+<section class="writer">
+    <header class="writer-head">
+        <p class="eyebrow">WRITE</p>
+        <h1>@(Model.IsEdit ? $"编辑 {Model.Slug}" : "写一篇")</h1>
+        <p class="muted">Markdown 格式，右边可以实时预览。保存后直接出现在博客里。</p>
+    </header>
+
+    @if (!string.IsNullOrEmpty(Model.Error))
+    {
+        <div class="alert">@Model.Error</div>
+    }
+
+    <form method="post" class="writer-form">
+        <div class="writer-meta">
+            <label class="field">
+                <span>Slug（网址）</span>
+                <input asp-for="Slug" placeholder="hello-world" />
+            </label>
+            <label class="field">
+                <span>标题</span>
+                <input asp-for="Title" placeholder="标题" />
+            </label>
+            <label class="field">
+                <span>摘要</span>
+                <input asp-for="Summary" placeholder="一句话说明" />
+            </label>
+            <label class="field">
+                <span>标签（逗号分隔）</span>
+                <input asp-for="Tags" placeholder="生活, 技术" />
+            </label>
+            <label class="field">
+                <span>可见性</span>
+                <select asp-for="Visibility">
+                    <option value="public">public · 所有人</option>
+                    <option value="member">member · 登录成员</option>
+                    <option value="private">private · 仅站长</option>
+                </select>
+            </label>
+            <label class="field checkbox">
+                <input asp-for="Draft" />
+                <span>存为草稿（列表里只有站长能看到）</span>
+            </label>
+        </div>
+
+        <div class="writer-body">
+            <label class="field">
+                <span>正文（Markdown）</span>
+                <textarea asp-for="Body" rows="22" placeholder="# 标题&#10;&#10;正文…"></textarea>
+            </label>
+            <div class="writer-preview">
+                <p class="writer-preview-title">预览</p>
+                <div class="post-body" id="preview"></div>
+            </div>
+        </div>
+
+        <div class="writer-actions">
+            <button class="btn" type="submit">保存</button>
+            <a class="btn ghost" href="/blog">回博客</a>
+        </div>
+    </form>
+</section>
+
+<script src="/assets/js/blog.js"></script>

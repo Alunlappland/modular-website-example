@@ -5,6 +5,33 @@
 
 ---
 
+## 2026-11-21 02:45 — M2：博客（Markdown、只读访客、反应、行级注释、评论审核）
+
+**做到哪**
+- 文章以 Markdown 文件为准（`Main\document\blog\*.md`），front-matter 描述标题/日期/摘要/标签/可见性/草稿。
+- 渲染用 **Markdig**：按顶层块切开，每块包一层 `<section class="md-block" data-block>`，
+  块的 HTML 哈希用于行级注释锚定（内容变了能看出"原文已变"）。
+- 页面：`/blog`（列表）、`/blog/{slug}`（文章）、`/write`（写作 + 实时预览，仅站长）。
+- 可见性：`public` / `member` / `private`，草稿仅站长可见；访客实测看不到私密草稿（404）。
+- 反应：点赞/点踩，匿名可点，按 Cookie 指纹去重（同一指纹重复点只计一次）。
+- 评论：访客提交进待审队列，站长/成员直接通过；站长可在文内一键"通过 / 拒绝"。
+- 行级注释：每个块悬浮「＋」，AJAX 提交；访客进待审，登录用户直接通过。
+- 审核：`ModerationService` 预留 Qwen（DashScope 兼容接口），配置关闭时全部转人工、绝不放行。
+- 接口：`/api/blog/{slug}/react`、`/api/blog/{slug}/annotations`（GET/POST）、`/api/blog/preview`，
+  全部带防伪令牌校验。
+- 测试：`Tools\e2e-m2.ps1` **28 项全部通过**（写作→渲染→可见性→反应去重→评论审核→行注释→预览）。
+
+**遇到的问题**
+1. Razor 页面路由：`@page "{slug}"` 生成的地址是 `/Blog/Post/{slug}`，必须写全 `@page "/blog/{slug}"`。
+2. Markdig 没有 `Block.ToHtml`：改用 `HtmlRenderer + pipeline.Setup(renderer)` 单块渲染。
+3. Dapper 又一次踩 record 材质化（`CommentRow`/`AnnotationRow`）→ 改成可写类。
+4. 防伪令牌解密失败连带 500：根因是文章页 500 导致 token 为空，修好页面即恢复。
+
+**下一步**
+- M3：文件收发（分块上传、限时分享、哈希收件箱、服务器文件沙箱）。
+
+---
+
 ## 2026-11-21 02:10 — M1：系统仪表盘 + 路由/挂载管理
 
 **做到哪**

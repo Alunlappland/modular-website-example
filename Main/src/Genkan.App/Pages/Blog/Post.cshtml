@@ -1,0 +1,131 @@
+@page "/blog/{slug}"
+@model Genkan.Pages.Blog.PostModel
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@{
+    ViewData["Title"] = Model.Post.Title;
+    var csrf = Antiforgery.GetAndStoreTokens(HttpContext).RequestToken;
+}
+<meta name="csrf" content="@csrf" />
+<link rel="stylesheet" href="/assets/css/blog.css" />
+
+<article class="post" data-slug="@Model.Post.Slug">
+    <header class="post-head">
+        <p class="eyebrow">@Model.Post.Date.ToLocalTime().ToString("yyyy-MM-dd")</p>
+        <h1>@Model.Post.Title</h1>
+        @if (!string.IsNullOrWhiteSpace(Model.Post.Summary))
+        {
+            <p class="post-summary">@Model.Post.Summary</p>
+        }
+        <div class="post-meta">
+            @foreach (var tag in Model.Post.Tags)
+            {
+                <span class="chip">@tag</span>
+            }
+            @if (Model.IsAdmin)
+            {
+                <a class="chip chip-edit" href="/write/@Model.Post.Slug">编辑</a>
+            }
+        </div>
+    </header>
+
+    <div class="post-body">
+        @foreach (var block in Model.Blocks)
+        {
+            var items = Model.Annotations.TryGetValue(block.Index, out var list) ? list : null;
+            <section class="md-block" data-block="@block.Index">
+                <button class="anno-btn" type="button" data-block="@block.Index" data-hash="@block.Hash"
+                        title="对这一块加注释">＋@(items is { Count: > 0 } ? items.Count : 0)</button>
+                <div class="md-content">@Html.Raw(block.Html)</div>
+                @if (items is not null && items.Count > 0)
+                {
+                    <ul class="anno-list">
+                        @foreach (var item in items)
+                        {
+                            <li class="@(item.Status == "approved" ? "" : "pending")">
+                                <b>@item.Author</b><span>@item.Body</span>
+                                @if (item.Status != "approved")
+                                {
+                                    <em>待审</em>
+                                }
+                            </li>
+                        }
+                    </ul>
+                }
+            </section>
+        }
+    </div>
+
+    <footer class="post-actions">
+        <button class="react" data-kind="like" type="button">👍 <span id="like-count">@Model.Reactions.Likes</span></button>
+        <button class="react" data-kind="dislike" type="button">👎 <span id="dislike-count">@Model.Reactions.Dislikes</span></button>
+    </footer>
+
+    <section class="comments" id="comments">
+        <h2>评论</h2>
+        @if (Model.Comments.Count == 0)
+        {
+            <p class="muted">还没有人说话。</p>
+        }
+        else
+        {
+            <ul class="comment-list">
+                @foreach (var comment in Model.Comments)
+                {
+                    <li class="@(comment.Status == "approved" ? "" : "pending")">
+                        <div class="comment-head">
+                            <b>@comment.Author</b>
+                            <time>@comment.CreatedAt</time>
+                            @if (Model.IsAdmin && comment.Status != "approved")
+                            {
+                                <form method="post" asp-page-handler="Approve">
+                                    <input type="hidden" name="id" value="@comment.Id" />
+                                    <button class="link" type="submit">通过</button>
+                                </form>
+                                <form method="post" asp-page-handler="Reject">
+                                    <input type="hidden" name="id" value="@comment.Id" />
+                                    <button class="link danger" type="submit">拒绝</button>
+                                </form>
+                            }
+                        </div>
+                        <p>@comment.Body</p>
+                    </li>
+                }
+            </ul>
+        }
+
+        @if (!string.IsNullOrEmpty(Model.Error))
+        {
+            <div class="alert">@Model.Error</div>
+        }
+
+        <form class="comment-form" method="post" asp-page-handler="Comment">
+            <label class="field">
+                <span>昵称</span>
+                <input name="CommentAuthor" maxlength="24" value="@Model.CommentAuthor" />
+            </label>
+            <label class="field">
+                <span>说点什么</span>
+                <textarea name="CommentBody" rows="3" maxlength="1000">@Model.CommentBody</textarea>
+            </label>
+            <button class="btn" type="submit">提交</button>
+            <p class="muted small">访客评论会先进审核队列；站长与成员直接显示。</p>
+        </form>
+    </section>
+</article>
+
+<div class="anno-pop" id="anno-pop" hidden>
+    <form id="anno-form">
+        <p class="anno-title">给这一块加注释</p>
+        <input type="hidden" name="blockIndex" />
+        <input type="hidden" name="blockHash" />
+        <input type="text" name="author" placeholder="昵称" maxlength="24" required />
+        <textarea name="body" rows="3" placeholder="想说的…" maxlength="500" required></textarea>
+        <div class="anno-actions">
+            <button class="btn" type="submit">提交</button>
+            <button class="btn ghost" type="button" id="anno-cancel">取消</button>
+        </div>
+        <p class="anno-status" id="anno-status"></p>
+    </form>
+</div>
+
+<script src="/assets/js/blog.js"></script>

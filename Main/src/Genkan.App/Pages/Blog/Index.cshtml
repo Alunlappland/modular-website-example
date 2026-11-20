@@ -1,0 +1,61 @@
+@page "/blog"
+@model Genkan.Pages.Blog.IndexModel
+@{
+    ViewData["Title"] = "博客";
+}
+<link rel="stylesheet" href="/assets/css/blog.css" />
+
+<section class="blog">
+    <header class="blog-head">
+        <div>
+            <p class="eyebrow">BLOG</p>
+            <h1>随手写的东西</h1>
+        </div>
+        <div class="blog-head-right">
+            @if (Model.IsAdmin)
+            {
+                <a class="btn" href="/write">写一篇</a>
+            }
+            <p class="blog-hint">访客只能看公开文章；草稿与私密文章只有站长可见。</p>
+        </div>
+    </header>
+
+    @if (Model.Posts.Count == 0)
+    {
+        <p class="muted">还没有文章。</p>
+    }
+    else
+    {
+        <ul class="post-list">
+            @foreach (var post in Model.Posts)
+            {
+                <li>
+                    <a class="post-item" href="/blog/@post.Slug">
+                        <div class="post-item-head">
+                            <h2>@post.Title</h2>
+                            @if (post.Draft)
+                            {
+                                <span class="tag off">草稿</span>
+                            }
+                            else if (post.Visibility != "public")
+                            {
+                                <span class="tag off">@post.Visibility</span>
+                            }
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(post.Summary))
+                        {
+                            <p class="post-item-summary">@post.Summary</p>
+                        }
+                        <div class="post-item-meta">
+                            <time>@post.Date.ToLocalTime().ToString("yyyy-MM-dd")</time>
+                            @foreach (var tag in post.Tags)
+                            {
+                                <span class="chip">@tag</span>
+                            }
+                        </div>
+                    </a>
+                </li>
+            }
+        </ul>
+    }
+</section>

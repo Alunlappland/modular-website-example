@@ -80,6 +80,41 @@ public sealed class GenkanDb
             updated_at TEXT NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS comments (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            post_slug  TEXT NOT NULL,
+            author     TEXT NOT NULL,
+            body       TEXT NOT NULL,
+            status     TEXT NOT NULL DEFAULT 'pending',
+            ip         TEXT,
+            created_at TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS ix_comments_post ON comments(post_slug, status);
+
+        CREATE TABLE IF NOT EXISTS annotations (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            post_slug   TEXT NOT NULL,
+            block_index INTEGER NOT NULL,
+            block_hash  TEXT NOT NULL,
+            author      TEXT NOT NULL,
+            body        TEXT NOT NULL,
+            status      TEXT NOT NULL DEFAULT 'pending',
+            created_at  TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS ix_annotations_post ON annotations(post_slug, status);
+
+        CREATE TABLE IF NOT EXISTS reactions (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            post_slug   TEXT NOT NULL,
+            kind        TEXT NOT NULL,
+            fingerprint TEXT NOT NULL,
+            created_at  TEXT NOT NULL
+        );
+
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_reactions ON reactions(post_slug, kind, fingerprint);
+
         INSERT INTO settings(key, value, updated_at)
         VALUES ('schema_version', '1', datetime('now'))
         ON CONFLICT(key) DO NOTHING;

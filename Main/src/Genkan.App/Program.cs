@@ -2,9 +2,11 @@ using System.Reflection;
 using System.Security.Claims;
 using Dapper;
 using Genkan;
+using Genkan.Blog;
 using Genkan.Data;
 using Genkan.Security;
 using Genkan.Sys;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -68,6 +70,10 @@ builder.Services.AddSingleton(database);
 builder.Services.AddSingleton<ExtendRegistry>();
 builder.Services.AddSingleton<ExtendStore>();
 builder.Services.AddSingleton<SysMonitor>();
+builder.Services.AddSingleton<BlogService>();
+builder.Services.AddSingleton<BlogRepository>();
+builder.Services.AddSingleton<ModerationService>();
+builder.Services.AddHttpClient("moderation", client => client.Timeout = TimeSpan.FromSeconds(8));
 builder.Services.AddSingleton<SetupState>();
 builder.Services.AddScoped<UserRepository>();
 builder.Services.AddScoped<AuditLog>();
@@ -336,12 +342,115 @@ app.UseWhen(
 app.MapGet("/api/sys", (SysMonitor monitor) => Results.Json(monitor.Sample()))
     .RequireAuthorization();
 
+// ---------- 博客：反应 / 行级注释 / 预览 ----------
+app.MapPost("/api/blog/{slug}/react", async (
+    string slug,
+    ReactRequest request,
+    HttpContext context,
+    IAntiforgery antiforgery,
+    BlogService blog,
+    BlogRepository repository) =>
+{
+    await antiforgery.ValidateRequestAsync(context);
+
+    if (blog.Find(slug) is null)
+    {
+        return Results.NotFound();
+    }
+
+    if (request.Kind is not ("like" or "dislike"))
+    {
+        return Results.BadRequest("kind 只能是 like 或 dislike。");
+    }
+
+    repository.React(slug, request.Kind, Fingerprint(context));
+    return Results.Json(repository.Counts(slug));
+});
+
+app.MapGet("/api/blog/{slug}/annotations", (
+    string slug,
+    HttpContext context,
+    BlogRepository repository) =>
+    Results.Json(repository.Annotations(slug, context.User.IsInRole("admin"))));
+
+app.MapPost("/api/blog/{slug}/annotations", async (
+    string slug,
+    AnnotateRequest request,
+    HttpContext context,
+    IAntiforgery antiforgery,
+    BlogService blog,
+    BlogRepository repository,
+    ModerationService moderation) =>
+{
+    await antiforgery.ValidateRequestAsync(context);
+
+    if (blog.Find(slug) is null)
+    {
+        return Results.NotFound();
+    }
+
+    var author = (request.Author ?? string.Empty).Trim();
+    var body = (request.Body ?? string.Empty).Trim();
+
+    if (author.Length is < 1 or > 24)
+    {
+        return Results.BadRequest("昵称要 1–24 个字。");
+    }
+
+    if (body.Length is < 1 or > 500)
+    {
+        return Results.BadRequest("注释要 1–500 个字。");
+    }
+
+    var status = context.User.Identity?.IsAuthenticated == true
+        ? "approved"
+        : await moderation.ReviewAsync(author + "：" + body);
+
+    var id = repository.AddAnnotation(slug, request.BlockIndex, request.BlockHash ?? string.Empty, author, body, status);
+    return Results.Json(new { id, status });
+});
+
+app.MapPost("/api/blog/preview", async (
+    PreviewRequest request,
+    HttpContext context,
+    IAntiforgery antiforgery,
+    BlogService blog) =>
+{
+    await antiforgery.ValidateRequestAsync(context);
+
+    if (!context.User.IsInRole("admin"))
+    {
+        return Results.Forbid();
+    }
+
+    return Results.Json(blog.Render(request.Markdown ?? string.Empty));
+});
+
 app.MapRazorPages();
 
 app.Lifetime.ApplicationStarted.Register(() =>
     Log.Information("玄关已开门：{Urls}  站点根目录：{Root}", configuredUrls ?? "(默认)", siteRoot));
 
 app.Run();
+
+static string Fingerprint(HttpContext context)
+{
+    if (context.Request.Cookies.TryGetValue("genkan.fp", out var existing) && !string.IsNullOrWhiteSpace(existing))
+    {
+        return existing;
+    }
+
+    var fingerprint = Guid.NewGuid().ToString("N");
+    context.Response.Cookies.Append("genkan.fp", fingerprint, new CookieOptions
+    {
+        Path = "/",
+        HttpOnly = true,
+        SameSite = SameSiteMode.Lax,
+        MaxAge = TimeSpan.FromDays(365),
+    });
+
+    return fingerprint;
+}
 
 static string BuildFramePage(ExtendEntry mount)
 {
