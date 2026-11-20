@@ -31,3 +31,7 @@ Extend/*/logs/
 Thumbs.db
 .vs/
 .idea/
+
+# 安装包（可重新下载）
+Main/depend/openssh/*.msi
+Main/depend/openssh/*.zip
