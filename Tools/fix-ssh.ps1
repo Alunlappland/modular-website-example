@@ -16,8 +16,20 @@ if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administra
 
 function Test-SshdBinary([string]$exe) {
     if (-not (Test-Path $exe)) { return $false }
-    & $exe -V *> $null
-    return ($LASTEXITCODE -eq 0)
+    # PS 5.1 会把原生命令的 stderr 当错误，而 sshd -V 恰好写到 stderr；
+    # 这里临时放宽 ErrorActionPreference，避免误判成失败。
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $null = & $exe -V 2>&1
+        return ($LASTEXITCODE -eq 0)
+    }
+    catch {
+        return $false
+    }
+    finally {
+        $ErrorActionPreference = $previous
+    }
 }
 
 $systemExe = Join-Path $env:SystemRoot 'System32\OpenSSH\sshd.exe'
@@ -79,7 +91,9 @@ $keygen = Join-Path $installDir 'ssh-keygen.exe'
 $keys = Get-ChildItem $confDir -Filter 'ssh_host_*_key' -ErrorAction SilentlyContinue
 if (-not $keys) {
     Write-Host '→ 生成主机密钥 ...' -ForegroundColor Cyan
-    & $keygen -A
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try { & $keygen -A } finally { $ErrorActionPreference = $previous }
 }
 
 # ---- 启动服务 ----
@@ -92,10 +106,16 @@ if ($svc.Status -ne 'Running') {
 }
 
 # ---- 防火墙 ----
-if (-not (Get-NetFirewallRule -DisplayName 'Genkan SSH' -ErrorAction SilentlyContinue)) {
-    New-NetFirewallRule -DisplayName 'Genkan SSH' -Direction Inbound -Protocol TCP `
-        -LocalPort $SshPort -Action Allow -Profile Any | Out-Null
-    Write-Host '  ✓ 已放行防火墙'
+try {
+    $rule = Get-NetFirewallRule -DisplayName 'Genkan SSH' -ErrorAction SilentlyContinue
+    if (-not $rule) {
+        New-NetFirewallRule -DisplayName 'Genkan SSH' -Direction Inbound -Protocol TCP `
+            -LocalPort $SshPort -Action Allow -Profile Any | Out-Null
+        Write-Host '  ✓ 已放行防火墙'
+    }
+}
+catch {
+    Write-Host "  防火墙规则处理失败（可忽略，若手机连不上再手工放行 22）：$($_.Exception.Message)" -ForegroundColor Yellow
 }
 
 # ---- 默认 shell ----
