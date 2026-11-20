@@ -5,6 +5,29 @@
 
 ---
 
+## 2026-11-21 02:10 — M1：系统仪表盘 + 路由/挂载管理
+
+**做到哪**
+- `/dashboard`：仿 Windows 任务管理器——CPU、内存、网络吞吐、进程数四张卡 + 磁盘用量条 +
+  进程 Top8（内存排序）+ 关键服务状态；前端每 2 秒拉 `/api/sys` 局部刷新。
+- 系统信息全部零依赖：`GetSystemTimes` / `GlobalMemoryStatusEx` 走 kernel32 P/Invoke，
+  磁盘用 `DriveInfo`，网络用 `NetworkInterface`，服务状态用 `sc query`（10 秒缓存）。
+- `/admin/routes`：挂载增删改、启停、按 `static / iframe / link` 三种类型；
+  保存后**立即生效**——挂载从"启动时 Map"改成"每次请求按当前注册表解析"。
+- **仅本机**：带 `Cf-Connecting-IP` / `CF-Ray` / `Cf-Visitor` 的请求直接 403（隧道来的就是）。
+- 新增 `Tools\e2e-m1.ps1`：**17 项全部通过**（含热生效、停用 404、伪造 CF 头 403、删除清理）；
+  `smoke-test.ps1` 5 项通过。
+
+**遇到的问题**
+1. Razor 的 `PageModel` 已有 `Url` 属性，自定义同名属性触发 CS0108 警告 → 改名 `TargetUrl`。
+2. `ExtendStore` 里 `Path.Combine` 的可空警告 → 先取本地非空变量再拼。
+3. PS 5.1 的 `Start-Process` 没有 `-Environment` 参数 → 测试时改用后台作业启动服务。
+
+**下一步**
+- M2：博客（Markdown 渲染、文章管理、访客只读、点赞点踩、行级注释、评论 + Qwen 审核）。
+
+---
+
 ## 2026-11-21 01:20 — M0.2：登录、账号、双端布局、主题、SQLite
 
 **做到哪**

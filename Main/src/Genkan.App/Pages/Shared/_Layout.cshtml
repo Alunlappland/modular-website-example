@@ -3,6 +3,7 @@
     if (theme is not ("surface" or "inner" or "neutral")) theme = "surface";
 
     var authed = User.Identity?.IsAuthenticated == true;
+    var isAdmin = User.IsInRole("admin");
     var display = User.FindFirst("display")?.Value ?? (authed ? User.Identity!.Name : "访客");
     var role = User.FindFirst(ClaimTypes.Role)?.Value ?? "guest";
     var here = Context.Request.Path.Value ?? "/";
@@ -66,6 +67,18 @@
                 {
                     <a class="snav-link @Active(item.Path)" href="@item.Path">
                         <span class="glyph">@item.Glyph</span><span>@item.Label</span>
+                    </a>
+                }
+                @if (authed)
+                {
+                    <a class="snav-link @Active("/dashboard")" href="/dashboard">
+                        <span class="glyph">▤</span><span>仪表盘</span>
+                    </a>
+                }
+                @if (isAdmin)
+                {
+                    <a class="snav-link @Active("/admin")" href="/admin/routes">
+                        <span class="glyph">⚙</span><span>路由管理</span>
                     </a>
                 }
             </nav>

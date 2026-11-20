@@ -1,0 +1,112 @@
+@page
+@model Genkan.Pages.Admin.RoutesModel
+@{
+    ViewData["Title"] = "路由与挂载";
+}
+<link rel="stylesheet" href="/assets/css/admin.css" />
+
+<section class="admin">
+    <header class="admin-head">
+        <div>
+            <p class="eyebrow">ADMIN · 仅本机</p>
+            <h1>路由与挂载</h1>
+        </div>
+        <p class="admin-hint">经 Cloudflare 隧道访问这里会被直接 403；改完立刻生效，不用重启。</p>
+    </header>
+
+    @if (!string.IsNullOrEmpty(Model.Error))
+    {
+        <div class="alert">@Model.Error</div>
+    }
+    @if (!string.IsNullOrEmpty(Model.Info))
+    {
+        <div class="notice">@Model.Info</div>
+    }
+
+    <div class="admin-table-wrap">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>标题</th>
+                    <th>路由</th>
+                    <th>类型</th>
+                    <th>权限</th>
+                    <th>排序</th>
+                    <th>状态</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var mount in Model.Mounts)
+                {
+                    <tr>
+                        <td><code>@mount.Id</code></td>
+                        <td>@mount.Title</td>
+                        <td><a href="@mount.Route" target="_blank" rel="noreferrer">@mount.Route</a></td>
+                        <td>@mount.Kind</td>
+                        <td>@(mount.Permission ?? "—")</td>
+                        <td>@mount.Order</td>
+                        <td><span class="tag @(mount.Enabled ? "on" : "off")">@(mount.Enabled ? "启用" : "停用")</span></td>
+                        <td class="ops">
+                            <a href="/admin/routes?edit=@mount.Id">编辑</a>
+                            <form method="post" asp-page-handler="Toggle">
+                                <input type="hidden" name="id" value="@mount.Id" />
+                                <button class="link" type="submit">@(mount.Enabled ? "停用" : "启用")</button>
+                            </form>
+                            <form method="post" asp-page-handler="Delete" onsubmit="return confirm('删除 @mount.Id 及其目录？');">
+                                <input type="hidden" name="id" value="@mount.Id" />
+                                <button class="link danger" type="submit">删除</button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <section class="admin-form">
+        <h2>@(string.IsNullOrEmpty(Model.Id) ? "新增挂载" : $"编辑 {Model.Id}")</h2>
+        <form method="post" asp-page-handler="Save">
+            <div class="grid2">
+                <label class="field">
+                    <span>ID（小写字母 / 数字 / 短横线）</span>
+                    <input asp-for="Id" placeholder="notes" />
+                </label>
+                <label class="field">
+                    <span>标题</span>
+                    <input asp-for="Title" placeholder="随手记" />
+                </label>
+                <label class="field">
+                    <span>路由</span>
+                    <input asp-for="Route" placeholder="/notes" />
+                </label>
+                <label class="field">
+                    <span>类型</span>
+                    <select asp-for="Kind">
+                        <option value="static">static · 静态目录</option>
+                        <option value="iframe">iframe · 内嵌网页</option>
+                        <option value="link">link · 外链跳转</option>
+                    </select>
+                </label>
+                <label class="field">
+                    <span>URL（iframe / link 必填）</span>
+                    <input asp-for="TargetUrl" placeholder="http://127.0.0.1:5244" />
+                </label>
+                <label class="field">
+                    <span>权限点（留空 = 登录即可）</span>
+                    <input asp-for="Permission" placeholder="chat.use" />
+                </label>
+                <label class="field">
+                    <span>排序（小的在前）</span>
+                    <input asp-for="Order" type="number" />
+                </label>
+                <label class="field checkbox">
+                    <input asp-for="Enabled" />
+                    <span>启用</span>
+                </label>
+            </div>
+            <button class="btn" type="submit">保存挂载</button>
+        </form>
+    </section>
+</section>

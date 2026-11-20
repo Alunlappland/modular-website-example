@@ -1,0 +1,129 @@
+/* 仪表盘：Windows 任务管理器风格的卡片与进度条 */
+
+.win { max-width: 1020px; }
+
+.win-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 22px;
+}
+
+.win-title h1 { margin: 0; font-size: 26px; font-weight: 650; letter-spacing: 0.01em; }
+
+.win-meta {
+  font-size: 12px;
+  color: var(--ink-soft);
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.win-meta .sep { opacity: 0.45; }
+
+.win-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.win-card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  padding: 16px 18px;
+  box-shadow: var(--shadow);
+  margin-bottom: 12px;
+}
+
+.win-grid .win-card { margin-bottom: 0; }
+
+.win-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin-bottom: 10px;
+}
+
+.win-card-head b {
+  font-size: 18px;
+  font-weight: 650;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.bar {
+  height: 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 9%, transparent);
+  overflow: hidden;
+}
+
+.bar i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #fff));
+  transition: width 0.45s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.win-sub { margin: 9px 0 0; font-size: 11.5px; color: var(--ink-faint); }
+
+.disks { display: grid; gap: 12px; }
+
+.disk-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin-bottom: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.disk-head em { font-style: normal; color: var(--ink-faint); }
+
+.win-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+
+.win-table th {
+  text-align: left;
+  font-weight: 500;
+  color: var(--ink-faint);
+  font-size: 11.5px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.win-table td { padding: 7px 8px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.win-table td:first-child { font-family: var(--font-mono); font-size: 12.5px; }
+.win-table tr:last-child td { border-bottom: 0; }
+
+.win-services { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+
+.win-services li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--line);
+}
+
+.win-services li:last-child { border-bottom: 0; }
+
+.tag { font-size: 11px; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.tag.on { background: rgba(79, 157, 105, 0.15); color: #3f8c5c; }
+.tag.off { background: rgba(154, 144, 132, 0.16); color: var(--ink-faint); }
+
+@media (max-width: 900px) {
+  .win-title h1 { font-size: 22px; }
+  .win-card { padding: 14px 15px; }
+  .win-meta { font-size: 11.5px; }
+}

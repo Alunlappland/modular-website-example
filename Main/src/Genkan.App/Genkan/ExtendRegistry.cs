@@ -12,28 +12,47 @@ public sealed record ExtendEntry(
     string? Permission,
     bool Enabled,
     string Directory,
-    int Order);
+    int Order,
+    string? Url);
 
 /// <summary>
 /// 扫描 <c>Extend\*\extend.json</c>，把磁盘上的挂载清单读进内存。
-/// 磁盘是唯一事实来源，界面上的增删改最终都写回磁盘。
+/// 磁盘是唯一事实来源；管理页保存后调用 <see cref="Reload"/> 即时生效。
 /// </summary>
 public sealed class ExtendRegistry
 {
-    private readonly List<ExtendEntry> _entries = new();
+    private readonly object _gate = new();
+    private readonly ILogger<ExtendRegistry> _logger;
+    private IReadOnlyList<ExtendEntry> _entries = Array.Empty<ExtendEntry>();
+
+    public ExtendRegistry(GenkanPaths paths, ILogger<ExtendRegistry> logger)
+    {
+        _logger = logger;
+        Reload(paths);
+    }
 
     public IReadOnlyList<ExtendEntry> Entries => _entries;
 
-    public ExtendRegistry(GenkanPaths paths, ILogger<ExtendRegistry> logger)
-        => Scan(paths, logger);
+    public ExtendEntry? FindById(string id)
+        => _entries.FirstOrDefault(e => string.Equals(e.Id, id, StringComparison.OrdinalIgnoreCase));
 
-    public void Scan(GenkanPaths paths, ILogger logger)
+    public void Reload(GenkanPaths paths)
     {
-        _entries.Clear();
+        var scanned = Scan(paths);
+        lock (_gate)
+        {
+            _entries = scanned;
+        }
+    }
+
+    private IReadOnlyList<ExtendEntry> Scan(GenkanPaths paths)
+    {
+        var list = new List<ExtendEntry>();
+
         if (!Directory.Exists(paths.Extend))
         {
-            logger.LogInformation("Extend 目录不存在，跳过挂载扫描：{Path}", paths.Extend);
-            return;
+            _logger.LogInformation("Extend 目录不存在，跳过挂载扫描：{Path}", paths.Extend);
+            return list;
         }
 
         foreach (var dir in Directory.EnumerateDirectories(paths.Extend))
@@ -68,6 +87,7 @@ public sealed class ExtendRegistry
                 {
                     route = "/" + route;
                 }
+
                 route = route.TrimEnd('/');
                 if (route.Length == 0)
                 {
@@ -75,25 +95,28 @@ public sealed class ExtendRegistry
                 }
 
                 var permission = Str("permission");
-                _entries.Add(new ExtendEntry(
+                var kind = Str("kind", "static");
+
+                list.Add(new ExtendEntry(
                     Id: id,
                     Title: Str("title", id),
                     Route: route,
-                    Kind: Str("kind", "static"),
+                    Kind: kind,
                     Entry: Str("entry", "index.html"),
                     Permission: string.IsNullOrWhiteSpace(permission) ? null : permission,
                     Enabled: Bool("enabled", true),
                     Directory: dir,
-                    Order: Int("order", 100)));
+                    Order: Int("order", 100),
+                    Url: string.IsNullOrWhiteSpace(Str("url")) ? null : Str("url")));
 
-                logger.LogInformation("发现挂载物 {Id} → {Route}（{Kind}）", id, route, Str("kind", "static"));
+                _logger.LogInformation("发现挂载物 {Id} → {Route}（{Kind}）", id, route, kind);
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "挂载清单解析失败，已跳过：{Manifest}", manifest);
+                _logger.LogWarning(ex, "挂载清单解析失败，已跳过：{Manifest}", manifest);
             }
         }
 
-        _entries.Sort((a, b) => a.Order.CompareTo(b.Order));
+        return list.OrderBy(e => e.Order).ThenBy(e => e.Id, StringComparer.Ordinal).ToList();
     }
 }

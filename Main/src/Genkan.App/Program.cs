@@ -4,10 +4,12 @@ using Dapper;
 using Genkan;
 using Genkan.Data;
 using Genkan.Security;
+using Genkan.Sys;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.FileProviders;
 using Serilog;
 using Serilog.Events;
@@ -64,6 +66,8 @@ database.EnsureSchema();
 builder.Services.AddSingleton(paths);
 builder.Services.AddSingleton(database);
 builder.Services.AddSingleton<ExtendRegistry>();
+builder.Services.AddSingleton<ExtendStore>();
+builder.Services.AddSingleton<SysMonitor>();
 builder.Services.AddSingleton<SetupState>();
 builder.Services.AddScoped<UserRepository>();
 builder.Services.AddScoped<AuditLog>();
@@ -210,66 +214,127 @@ app.MapGet("/theme", (HttpContext context, string? name, string? returnUrl) =>
     return Results.Redirect(back);
 });
 
-// Extend\ 下的静态挂载物（按权限放行）
-foreach (var extend in registry.Entries.Where(e =>
-             e.Enabled && string.Equals(e.Kind, "static", StringComparison.OrdinalIgnoreCase)))
+// 挂载物：每次请求按当前注册表解析，管理页保存后即时生效（无需重启）
+var contentTypes = new FileExtensionContentTypeProvider();
+
+app.Use(async (context, next) =>
 {
-    var mountRoot = Directory.Exists(Path.Combine(extend.Directory, "www"))
-        ? Path.Combine(extend.Directory, "www")
-        : extend.Directory;
-    var provider = new PhysicalFileProvider(mountRoot);
-    var permission = extend.Permission;
+    var path = context.Request.Path.Value ?? "/";
+    var mount = registry.Entries.FirstOrDefault(e =>
+        e.Enabled &&
+        (path.Equals(e.Route, StringComparison.OrdinalIgnoreCase) ||
+         path.StartsWith(e.Route + "/", StringComparison.OrdinalIgnoreCase)));
 
-    app.Map(extend.Route, branch =>
+    if (mount is null)
     {
-        if (!string.IsNullOrWhiteSpace(permission))
+        await next();
+        return;
+    }
+
+    if (!string.IsNullOrWhiteSpace(mount.Permission))
+    {
+        if (!Permissions.IsAuthenticated(context.User))
         {
-            branch.Use(async (context, next) =>
-            {
-                if (!Permissions.IsAuthenticated(context.User))
-                {
-                    var target = context.Request.Path + context.Request.QueryString;
-                    context.Response.Redirect("/login?returnUrl=" + Uri.EscapeDataString(target));
-                    return;
-                }
-
-                if (!Permissions.Has(context.User, permission))
-                {
-                    context.Response.StatusCode = StatusCodes.Status403Forbidden;
-                    context.Response.ContentType = "text/plain; charset=utf-8";
-                    await context.Response.WriteAsync("没有访问「" + extend.Title + "」的权限。");
-                    return;
-                }
-
-                await next();
-            });
+            var target = path + context.Request.QueryString;
+            context.Response.Redirect("/login?returnUrl=" + Uri.EscapeDataString(target));
+            return;
         }
 
-        branch.UseDefaultFiles(new DefaultFilesOptions { FileProvider = provider });
-        branch.UseStaticFiles(new StaticFileOptions { FileProvider = provider });
-
-        branch.Run(async context =>
+        if (!Permissions.Has(context.User, mount.Permission!))
         {
-            var requestPath = context.Request.Path.Value ?? string.Empty;
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            context.Response.ContentType = "text/plain; charset=utf-8";
+            await context.Response.WriteAsync("没有访问「" + mount.Title + "」的权限。");
+            return;
+        }
+    }
 
-            if (!requestPath.EndsWith('/'))
-            {
-                context.Response.Redirect(requestPath + "/", permanent: false);
-                return;
-            }
+    if (string.Equals(mount.Kind, "link", StringComparison.OrdinalIgnoreCase))
+    {
+        context.Response.Redirect(string.IsNullOrWhiteSpace(mount.Url) ? "/" : mount.Url!);
+        return;
+    }
 
-            var index = Path.Combine(mountRoot, "index.html");
-            if (!File.Exists(index))
-            {
-                context.Response.StatusCode = StatusCodes.Status404NotFound;
-                return;
-            }
+    if (string.Equals(mount.Kind, "iframe", StringComparison.OrdinalIgnoreCase))
+    {
+        context.Response.ContentType = "text/html; charset=utf-8";
+        await context.Response.WriteAsync(BuildFramePage(mount));
+        return;
+    }
 
+    var root = Directory.Exists(Path.Combine(mount.Directory, "www"))
+        ? Path.Combine(mount.Directory, "www")
+        : mount.Directory;
+
+    var rel = path.Length > mount.Route.Length
+        ? path[mount.Route.Length..].TrimStart('/')
+        : string.Empty;
+
+    if (rel.Length == 0 && !path.EndsWith('/'))
+    {
+        context.Response.Redirect(path + "/", permanent: false);
+        return;
+    }
+
+    if (rel.Length == 0)
+    {
+        rel = "index.html";
+    }
+
+    var full = Path.GetFullPath(Path.Combine(root, rel));
+    var rootFull = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+
+    if (!full.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase))
+    {
+        context.Response.StatusCode = StatusCodes.Status404NotFound;
+        return;
+    }
+
+    if (Directory.Exists(full))
+    {
+        full = Path.Combine(full, "index.html");
+    }
+
+    if (!File.Exists(full) && !Path.HasExtension(full))
+    {
+        // 没有扩展名的路径当作前端路由，回退到 index.html
+        full = Path.Combine(root, "index.html");
+    }
+
+    if (!File.Exists(full))
+    {
+        context.Response.StatusCode = StatusCodes.Status404NotFound;
+        return;
+    }
+
+    context.Response.ContentType = contentTypes.TryGetContentType(full, out var contentType)
+        ? contentType
+        : "application/octet-stream";
+    context.Response.Headers.CacheControl = "no-cache";
+    await context.Response.SendFileAsync(full);
+});
+
+// 路由与挂载管理：只允许本机（隧道过来的请求带 CF 头，直接 403）
+app.UseWhen(
+    context => context.Request.Path.StartsWithSegments("/admin"),
+    branch => branch.Use(async (context, next) =>
+    {
+        if (!LocalOnly.IsLocal(context))
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
             context.Response.ContentType = "text/html; charset=utf-8";
-            await context.Response.SendFileAsync(index);
-        });
-    });
-}
+            await context.Response.WriteAsync(
+                "<!doctype html><html lang=\"zh-CN\"><meta charset=\"utf-8\">" +
+                "<body style=\"font-family:system-ui;padding:40px\">" +
+                "<h1>403</h1><p>路由与挂载管理只允许在本机操作。</p></body></html>");
+            return;
+        }
+
+        await next();
+    }));
+
+app.MapGet("/api/sys", (SysMonitor monitor) => Results.Json(monitor.Sample()))
+    .RequireAuthorization();
 
 app.MapRazorPages();
 
@@ -277,6 +342,39 @@ app.Lifetime.ApplicationStarted.Register(() =>
     Log.Information("玄关已开门：{Urls}  站点根目录：{Root}", configuredUrls ?? "(默认)", siteRoot));
 
 app.Run();
+
+static string BuildFramePage(ExtendEntry mount)
+{
+    var encoder = System.Text.Encodings.Web.HtmlEncoder.Default;
+    var title = encoder.Encode(mount.Title);
+    var url = encoder.Encode(mount.Url ?? "about:blank");
+
+    return $$"""
+        <!doctype html>
+        <html lang="zh-CN">
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>{{title}}</title>
+          <style>
+            html, body { margin: 0; height: 100%; font-family: "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif; }
+            header { display: flex; align-items: center; gap: 12px; padding: 8px 14px;
+                     border-bottom: 1px solid rgba(0,0,0,.12); font-size: 13px; }
+            header a { color: inherit; text-decoration: none; }
+            iframe { border: 0; width: 100%; height: calc(100% - 38px); display: block; }
+            @media (prefers-color-scheme: dark) {
+              body { background: #121017; color: #ece7f2; }
+              header { border-color: rgba(255,255,255,.14); }
+            }
+          </style>
+        </head>
+        <body>
+          <header><a href="/">← 玄关</a><span>{{title}}</span></header>
+          <iframe src="{{url}}" referrerpolicy="no-referrer"></iframe>
+        </body>
+        </html>
+        """;
+}
 
 static string ResolveSiteRoot()
 {

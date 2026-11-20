@@ -1,0 +1,87 @@
+@page
+@model Genkan.Pages.DashboardModel
+@{
+    ViewData["Title"] = "仪表盘";
+}
+<link rel="stylesheet" href="/assets/css/dashboard.css" />
+
+<section class="win">
+    <header class="win-title">
+        <div>
+            <p class="eyebrow">SYSTEM</p>
+            <h1>@Model.Snapshot.Host</h1>
+        </div>
+        <div class="win-meta">
+            <span id="uptime">已运行 @Model.UptimeText</span>
+            <span class="sep">·</span>
+            <span>@Model.Snapshot.Os</span>
+        </div>
+    </header>
+
+    <div class="win-grid">
+        <article class="win-card">
+            <div class="win-card-head"><span>处理器</span><b id="cpu-val">@Model.Snapshot.CpuPercent%</b></div>
+            <div class="bar"><i id="cpu-bar" style="width:@(Model.Snapshot.CpuPercent)%"></i></div>
+            <p class="win-sub">每 2 秒采样一次</p>
+        </article>
+
+        <article class="win-card">
+            <div class="win-card-head"><span>内存</span><b id="mem-val">@Model.Snapshot.MemoryUsedPercent%</b></div>
+            <div class="bar"><i id="mem-bar" style="width:@(Model.Snapshot.MemoryUsedPercent)%"></i></div>
+            <p class="win-sub" id="mem-sub">@Model.MemoryText</p>
+        </article>
+
+        <article class="win-card">
+            <div class="win-card-head"><span>网络</span><b id="net-val">↓ @Model.Snapshot.RxKbPerSec KB/s</b></div>
+            <p class="win-sub" id="net-sub">↑ @Model.Snapshot.TxKbPerSec KB/s</p>
+        </article>
+
+        <article class="win-card">
+            <div class="win-card-head"><span>进程</span><b id="proc-count">@Model.Snapshot.ProcessCount</b></div>
+            <p class="win-sub">正在运行的进程总数</p>
+        </article>
+    </div>
+
+    <article class="win-card">
+        <div class="win-card-head"><span>磁盘</span><span class="win-sub">可用 / 总量</span></div>
+        <div class="disks" id="disks">
+            @foreach (var disk in Model.Snapshot.Disks)
+            {
+                var used = disk.TotalBytes - disk.FreeBytes;
+                var percent = disk.TotalBytes == 0 ? 0 : used * 100.0 / disk.TotalBytes;
+                <div class="disk">
+                    <div class="disk-head">
+                        <span>@disk.Name <em>@disk.Label</em></span>
+                        <span>@((disk.FreeBytes / 1024.0 / 1024 / 1024).ToString("F1")) GB 可用 / @((disk.TotalBytes / 1024.0 / 1024 / 1024).ToString("F0")) GB</span>
+                    </div>
+                    <div class="bar"><i style="width:@percent.ToString("F1")%"></i></div>
+                </div>
+            }
+        </div>
+    </article>
+
+    <article class="win-card">
+        <div class="win-card-head"><span>进程 · 按内存排序</span><span class="win-sub">前 8</span></div>
+        <table class="win-table">
+            <thead><tr><th>名称</th><th>PID</th><th>内存</th></tr></thead>
+            <tbody id="proc-body">
+                @foreach (var process in Model.Snapshot.Processes)
+                {
+                    <tr><td>@process.Name</td><td>@process.Pid</td><td>@process.WorkingSetMb MB</td></tr>
+                }
+            </tbody>
+        </table>
+    </article>
+
+    <article class="win-card">
+        <div class="win-card-head"><span>服务</span><span class="win-sub">每 10 秒刷新</span></div>
+        <ul class="win-services" id="svc-list">
+            @foreach (var service in Model.Snapshot.Services)
+            {
+                <li><span>@service.Name</span><b class="tag @(service.State == "Running" ? "on" : "off")">@service.State</b></li>
+            }
+        </ul>
+    </article>
+</section>
+
+<script src="/assets/js/dashboard.js"></script>

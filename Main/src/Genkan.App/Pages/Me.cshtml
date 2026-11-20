@@ -21,6 +21,11 @@
     </dl>
 
     <div class="row">
+        <a class="btn ghost" href="/dashboard">仪表盘</a>
+        @if (User.IsInRole("admin"))
+        {
+            <a class="btn ghost" href="/admin/routes">路由管理</a>
+        }
         <a class="btn ghost" href="/">回玄关</a>
         <form method="post" asp-page="/Logout">
             <button class="btn ghost" type="submit">退出登录</button>
