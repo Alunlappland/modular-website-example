@@ -41,6 +41,11 @@ public sealed class BackupService
 
     public bool Busy => _gate.CurrentCount == 0;
 
+    public long BeginExternalRun(string kind) => StartRun(kind);
+
+    public void EndExternalRun(long id, bool ok, string? error, string? output)
+        => FinishRun(id, ok, null, null, null, error, output);
+
     public async Task<(bool Ok, string Message)> RunAsync(string kind, CancellationToken cancellationToken)
     {
         if (!_kopia.Ready)

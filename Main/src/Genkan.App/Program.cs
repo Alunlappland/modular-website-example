@@ -91,6 +91,7 @@ builder.Services.AddSingleton<ShareService>();
 builder.Services.AddSingleton<SecretStore>();
 builder.Services.AddSingleton<KopiaService>();
 builder.Services.AddSingleton<BackupService>();
+builder.Services.AddSingleton<CloudMirrorService>();
 builder.Services.AddHostedService<BackupScheduler>();
 builder.Services.AddSingleton<SyncService>();
 builder.Services.AddHttpClient("syncthing", client => client.Timeout = TimeSpan.FromSeconds(3));

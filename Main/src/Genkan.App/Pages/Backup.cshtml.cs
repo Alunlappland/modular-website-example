@@ -14,6 +14,7 @@ public class BackupModel : PageModel
     private readonly KopiaService _kopia;
     private readonly SecretStore _secrets;
     private readonly BackupService _backup;
+    private readonly CloudMirrorService _cloud;
     private readonly GenkanPaths _paths;
     private readonly AuditLog _audit;
 
@@ -21,12 +22,14 @@ public class BackupModel : PageModel
         KopiaService kopia,
         SecretStore secrets,
         BackupService backup,
+        CloudMirrorService cloud,
         GenkanPaths paths,
         AuditLog audit)
     {
         _kopia = kopia;
         _secrets = secrets;
         _backup = backup;
+        _cloud = cloud;
         _paths = paths;
         _audit = audit;
     }
@@ -60,6 +63,26 @@ public class BackupModel : PageModel
     public int DaysSinceFull => _backup.DaysSinceLastFull();
 
     public bool Busy => _backup.Busy;
+
+    public bool CloudReady => _cloud.Ready;
+
+    public bool CloudMirroring => _cloud.Mirroring;
+
+    public string CloudStatus => _cloud.StatusSummary;
+
+    public string CloudEndpoint => _cloud.Endpoint;
+
+    public string CloudBucket => _cloud.Bucket;
+
+    public string CloudTarget => _cloud.Target;
+
+    public bool CloudHasCredentials => _cloud.HasCredentials;
+
+    [BindProperty]
+    public string? R2AccessKeyId { get; set; }
+
+    [BindProperty]
+    public string? R2SecretKey { get; set; }
 
     public string StagingPath => Path.Combine(_paths.Data, "restore-staging");
 
@@ -215,6 +238,80 @@ public class BackupModel : PageModel
         }
 
         return "(未知)";
+    }
+
+    public async Task<IActionResult> OnPostR2SaveAsync()
+    {
+        var keyId = (R2AccessKeyId ?? string.Empty).Trim();
+        var secret = (R2SecretKey ?? string.Empty).Trim();
+
+        if (keyId.Length < 8 || secret.Length < 8)
+        {
+            Error = "Access Key ID 和 Secret Access Key 都要填。";
+            await LoadAsync();
+            return Page();
+        }
+
+        _cloud.SaveCredentials(keyId, secret);
+        _audit.Write(HttpContext, "backup.r2.credentials", "r2", "ok");
+        Message = "R2 凭据已加密保存；点「测试连接」验证。";
+        await LoadAsync();
+        return Page();
+    }
+
+    public async Task<IActionResult> OnPostR2ClearAsync()
+    {
+        _cloud.ClearCredentials();
+        _audit.Write(HttpContext, "backup.r2.credentials.remove", "r2", "ok");
+        Message = "已清除 R2 凭据。";
+        await LoadAsync();
+        return Page();
+    }
+
+    public async Task<IActionResult> OnPostR2TestAsync()
+    {
+        var result = await _cloud.TestAsync(CancellationToken.None);
+
+        if (result.Ok)
+        {
+            Message = "连接成功：" + (string.IsNullOrWhiteSpace(result.StdOut) ? "桶列表可读" : result.StdOut.Split('\n')[0]);
+        }
+        else
+        {
+            Error = "连接失败：" + (string.IsNullOrWhiteSpace(result.StdErr) ? result.StdOut : result.StdErr.Split('\n')[0]);
+        }
+
+        _audit.Write(HttpContext, "backup.r2.test", "r2", result.Ok ? "ok" : "fail");
+        await LoadAsync();
+        return Page();
+    }
+
+    public async Task<IActionResult> OnPostR2MirrorAsync()
+    {
+        if (!_cloud.Ready)
+        {
+            Error = "镜像未就绪：" + _cloud.StatusSummary;
+            await LoadAsync();
+            return Page();
+        }
+
+        if (_cloud.Mirroring)
+        {
+            Message = "已经有一次镜像在跑。";
+            await LoadAsync();
+            return Page();
+        }
+
+        _ = Task.Run(async () =>
+        {
+            try { await _cloud.MirrorAsync(CancellationToken.None); }
+            catch { /* 结果写进历史 */ }
+        });
+
+        _audit.Write(HttpContext, "backup.r2.mirror", "r2", "started");
+        Message = "镜像已在后台开始，稍后刷新看历史里的 mirror 记录。";
+        await LoadAsync();
+        return Page();
     }
 
     private async Task LoadAsync()

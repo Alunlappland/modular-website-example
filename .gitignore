@@ -40,3 +40,7 @@ Extend/*/logs/
 Thumbs.db
 .vs/
 .idea/
+
+# ²¿ÊğÔİ´æÄ¿Â¼
+Main/bin.next/
+Main/bin.old/

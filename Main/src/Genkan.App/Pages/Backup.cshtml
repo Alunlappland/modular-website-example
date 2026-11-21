@@ -139,6 +139,60 @@
     </section>
 
     <section class="admin-form" style="margin-bottom:16px">
+        <h2>网盘镜像（Cloudflare R2）</h2>
+        <dl class="kv">
+            <div><dt>状态</dt><dd><span class="tag @(Model.CloudReady ? "on" : "off")">@Model.CloudStatus</span></dd></div>
+            <div><dt>端点</dt><dd><code>@Model.CloudEndpoint</code></dd></div>
+            <div><dt>桶</dt><dd><code>@Model.CloudBucket</code></dd></div>
+            <div><dt>目标</dt><dd><code>@Model.CloudTarget</code></dd></div>
+        </dl>
+
+        <p class="muted small">
+            每天备份成功后会按配置自动镜像；手动镜像走下面。
+            命令带 <code>--max-delete 50</code> 保险丝：本地仓库异常变空时最多删云端 50 个文件就停。
+        </p>
+
+        @if (Model.CloudMirroring)
+        {
+            <div class="notice">镜像进行中…</div>
+        }
+
+        <form method="post" asp-page-handler="R2Save">
+            <div class="grid2">
+                <label class="field">
+                    <span>Access Key ID</span>
+                    <input asp-for="R2AccessKeyId" autocomplete="off" />
+                </label>
+                <label class="field">
+                    <span>Secret Access Key</span>
+                    <input asp-for="R2SecretKey" type="password" autocomplete="new-password" />
+                </label>
+            </div>
+            <button class="btn" type="submit">保存凭据</button>
+        </form>
+
+        @if (Model.CloudHasCredentials)
+        {
+            <form method="post" asp-page-handler="R2Clear" style="margin-top:8px">
+                <button class="btn ghost" type="submit">清除凭据</button>
+            </form>
+        }
+
+        <div class="row">
+            <form method="post" asp-page-handler="R2Test">
+                <button class="btn ghost" type="submit">测试连接</button>
+            </form>
+            <form method="post" asp-page-handler="R2Mirror" onsubmit="return confirm('开始镜像到 R2？');">
+                <button class="btn" type="submit">立即镜像</button>
+            </form>
+        </div>
+
+        <p class="muted small">
+            凭据需要 R2 的 <b>Object Read &amp; Write</b> 权限；创建位置：Cloudflare → R2 → Manage R2 API Tokens。
+        </p>
+    </section>
+
+    <section class="admin-form" style="margin-bottom:16px">
         <h2>保留策略（预览）</h2>
         @if (Model.Retention is null)
         {

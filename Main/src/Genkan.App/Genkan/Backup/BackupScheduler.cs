@@ -7,12 +7,18 @@ namespace Genkan.Backup;
 public sealed class BackupScheduler : BackgroundService
 {
     private readonly BackupService _backup;
+    private readonly CloudMirrorService _cloud;
     private readonly IConfiguration _config;
     private readonly ILogger<BackupScheduler> _logger;
 
-    public BackupScheduler(BackupService backup, IConfiguration config, ILogger<BackupScheduler> logger)
+    public BackupScheduler(
+        BackupService backup,
+        CloudMirrorService cloud,
+        IConfiguration config,
+        ILogger<BackupScheduler> logger)
     {
         _backup = backup;
+        _cloud = cloud;
         _config = config;
         _logger = logger;
     }
@@ -45,6 +51,12 @@ public sealed class BackupScheduler : BackgroundService
                     var kind = _backup.DaysSinceLastFull() >= _backup.FullEveryDays ? "full" : "daily";
                     var (ok, message) = await _backup.RunAsync(kind, stoppingToken);
                     _logger.Log(ok ? LogLevel.Information : LogLevel.Warning, "计划备份（{Kind}）：{Message}", kind, message);
+
+                    if (ok && _config.GetValue("backup:cloud:autoMirror", false) && _cloud.Ready)
+                    {
+                        var (mirrorOk, mirrorMessage) = await _cloud.MirrorAsync(stoppingToken);
+                        _logger.Log(mirrorOk ? LogLevel.Information : LogLevel.Warning, "计划镜像：{Message}", mirrorMessage);
+                    }
                 }
             }
             catch (OperationCanceledException)

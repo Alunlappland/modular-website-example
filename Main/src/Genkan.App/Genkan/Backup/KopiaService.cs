@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.Json;
 using Genkan.Backup;
 
 namespace Genkan.Backup;
@@ -49,6 +50,32 @@ public sealed class KopiaService
         : !ConfigExists ? "找不到仓库配置文件"
         : !HasPassword ? "还没有保存仓库密码"
         : "就绪";
+
+    /// <summary>从 kopia 配置里读出 filesystem 仓库路径（用于 rclone 镜像）。</summary>
+    public string RepositoryPath()
+    {
+        try
+        {
+            if (!File.Exists(ConfigPath))
+            {
+                return string.Empty;
+            }
+
+            using var doc = JsonDocument.Parse(File.ReadAllText(ConfigPath));
+            if (doc.RootElement.TryGetProperty("storage", out var storage) &&
+                storage.TryGetProperty("config", out var config) &&
+                config.TryGetProperty("path", out var path))
+            {
+                return path.GetString() ?? string.Empty;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "读取 kopia 仓库路径失败。");
+        }
+
+        return string.Empty;
+    }
 
     public async Task<KopiaResult> RunAsync(IEnumerable<string> arguments, CancellationToken cancellationToken, int timeoutSeconds = 600)
     {
