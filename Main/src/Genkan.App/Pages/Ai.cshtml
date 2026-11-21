@@ -1,0 +1,76 @@
+@page "/ai"
+@model Genkan.Pages.AiModel
+@{
+    ViewData["Title"] = "对话";
+}
+<link rel="stylesheet" href="/assets/css/ai.css" asp-append-version="true" />
+
+<section class="ai-shell" id="ai" data-default="@Model.DefaultProvider">
+    <aside class="ai-side">
+        <button class="btn" type="button" id="ai-new">＋ 新对话</button>
+
+        <p class="ai-side-title">最近的对话</p>
+        <ul class="ai-chats" id="ai-chats"></ul>
+
+        <div class="ai-balance" id="ai-balance">
+            <p class="ai-side-title">余额</p>
+            <p class="muted small">点右上角「余额」查询</p>
+        </div>
+    </aside>
+
+    <div class="ai-main">
+        <header class="ai-head">
+            <select id="ai-provider" aria-label="供应商">
+                @foreach (var provider in Model.Providers)
+                {
+                    <option value="@provider.Id" selected="@(provider.Id == Model.DefaultProvider)">
+                        @provider.Name · @provider.Model
+                    </option>
+                }
+            </select>
+            <span class="ai-head-actions">
+                <button class="link" type="button" id="ai-balance-btn">余额</button>
+                <button class="link" type="button" id="ai-keys-btn">密钥</button>
+            </span>
+        </header>
+
+        <div class="ai-messages" id="ai-messages">
+            <div class="ai-welcome">
+                <p class="ai-welcome-title">今天想聊什么？</p>
+                <p class="muted small">
+                    选一个供应商，消息会经本站转发；对话以文件形式存在服务器上，只有你能看到。
+                </p>
+                @if (Model.MissingKeys.Count > 0)
+                {
+                    <p class="muted small">
+                        还没配 Key：@string.Join("、", Model.MissingKeys.Select(provider => provider.Name))
+                        ——点右上角「密钥」填。<b>Key 加密保存在服务器</b>，不会进浏览器历史。
+                    </p>
+                }
+            </div>
+        </div>
+
+        <form class="ai-input" id="ai-form">
+            <textarea id="ai-text" rows="3" placeholder="说点什么…（Ctrl + Enter 发送）"></textarea>
+            <button class="btn" type="submit" id="ai-send">发送</button>
+        </form>
+
+        <div class="ai-settings" id="ai-settings" hidden>
+            <div class="ai-settings-head">
+                <strong>供应商密钥</strong>
+                <button class="link" type="button" id="ai-settings-close">收起</button>
+            </div>
+            @foreach (var provider in Model.Providers)
+            {
+                <div class="ai-key-row">
+                    <span class="ai-key-name">@provider.Name</span>
+                    <input type="password" autocomplete="off" placeholder="sk-…（留空表示不修改）" data-provider="@provider.Id" />
+                    <button class="link" type="button" data-save="@provider.Id">保存</button>
+                </div>
+            }
+            <p class="muted small">Key 只存服务器（加密），接口请求也由服务器发出。</p>
+        </div>
+    </div>
+</section>
+
+<script src="/assets/js/ai.js" asp-append-version="true"></script>

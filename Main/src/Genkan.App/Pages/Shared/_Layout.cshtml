@@ -1,3 +1,4 @@
+@inject Genkan.Theme.ThemeService ThemeService
 @{
     var theme = Context.Request.Cookies["genkan.theme"] ?? "surface";
     if (theme is not ("surface" or "inner" or "neutral")) theme = "surface";
@@ -17,16 +18,21 @@
     var items = new (string Path, string Label, string Glyph)[]
     {
         ("/", "玄关", "⌂"),
-        ("/chat/", "对话", "✳"),
+        ("/ai", "对话", "✳"),
         ("/blog", "博客", "✎"),
         ("/files", "文件", "⇅"),
         ("/about", "关于", "☾"),
     };
 
     var soonItems = Array.Empty<(string Label, string Glyph)>();
+
+    var themeSettings = ThemeService.Load();
+    var hasBackground = ThemeService.HasBackground;
+    var effects = theme == "inner" && themeSettings.Effects;
+    var bgStyle = hasBackground ? $"--bg-image:url('/theme/background?v={ThemeService.BackgroundVersion}')" : string.Empty;
 }
 <!doctype html>
-<html lang="zh-CN" data-theme="@theme">
+<html lang="zh-CN" data-theme="@theme" data-fx="@(effects ? "on" : "off")" data-font="@themeSettings.Font">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -35,7 +41,7 @@
     <link rel="stylesheet" href="/assets/css/base.css" asp-append-version="true" />
     @await RenderSectionAsync("Head", required: false)
 </head>
-<body class="app" data-role="@role">
+<body class="app @(hasBackground ? "has-bg" : "")" data-role="@role" style="@bgStyle">
     <header class="mtop">
         <a class="mtop-brand" href="/">
             <img src="/assets/logo.svg" alt="" width="22" height="22" />

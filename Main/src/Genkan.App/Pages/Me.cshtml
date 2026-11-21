@@ -18,6 +18,10 @@
             <dt>上次登录</dt>
             <dd>@Model.LastLoginText</dd>
         </div>
+        <div>
+            <dt>当前提权</dt>
+            <dd>@(Model.Elevated ? "已提权（15 分钟）" : "未提权")</dd>
+        </div>
     </dl>
 
     <div class="row">
@@ -26,26 +30,119 @@
         {
             <a class="btn ghost" href="/admin/routes">路由管理</a>
         }
+        <a class="btn ghost" href="/ai">对话</a>
         <a class="btn ghost" href="/">回玄关</a>
         <form method="post" asp-page="/Logout">
             <button class="btn ghost" type="submit">退出登录</button>
         </form>
     </div>
+</section>
 
-    <p class="muted small">提权、二次验证、设备管理会在 M6 接上。</p>
+@if (!string.IsNullOrEmpty(Model.Message))
+{
+    <div class="notice" style="margin-top:16px">@Model.Message</div>
+}
+@if (!string.IsNullOrEmpty(Model.Error))
+{
+    <div class="alert" style="margin-top:16px">@Model.Error</div>
+}
+
+<section class="panel" style="margin-top:16px">
+    <h2>二次验证（TOTP）</h2>
+    <p class="muted small">
+        开启后，临时提权需要验证器里的 6 位验证码。服务器只保存密钥，不发短信、不联网。
+    </p>
+
+    @if (Model.TotpEnabled)
+    {
+        <p>状态：<span class="tag on">已启用</span></p>
+        <form method="post" asp-page-handler="TotpDisable" onsubmit="return confirm('关闭二次验证？提权将只靠密码。');">
+            <label class="field">
+                <span>验证码（关闭前确认）</span>
+                <input asp-for="TotpCode" inputmode="numeric" autocomplete="one-time-code" placeholder="123456" />
+            </label>
+            <button class="btn ghost" type="submit">关闭二次验证</button>
+        </form>
+    }
+    else if (Model.TotpSecret is not null)
+    {
+        <p>状态：<span class="tag">待确认</span></p>
+        <p class="muted small">在验证器里手动添加这个密钥（或点下面的链接）：</p>
+        <p><code class="secret">@Model.TotpSecret</code></p>
+        <p><a class="link" href="@Model.OtpauthUri">otpauth 链接</a></p>
+        <form method="post" asp-page-handler="TotpConfirm">
+            <label class="field">
+                <span>输入验证器上的 6 位验证码</span>
+                <input asp-for="TotpCode" inputmode="numeric" autocomplete="one-time-code" placeholder="123456" />
+            </label>
+            <button class="btn" type="submit">确认启用</button>
+        </form>
+    }
+    else
+    {
+        <p>状态：<span class="tag off">未启用</span></p>
+        <form method="post" asp-page-handler="TotpBegin">
+            <button class="btn" type="submit">生成密钥</button>
+        </form>
+    }
+</section>
+
+<section class="panel" style="margin-top:16px">
+    <h2>临时提权</h2>
+    <p class="muted small">
+        删除旧快照、恢复数据、导出恢复包这些操作需要先提权，有效期 15 分钟，过期自动失效。
+    </p>
+
+    @if (Model.Elevated)
+    {
+        <form method="post" asp-page-handler="DeElevate">
+            <button class="btn ghost" type="submit">退出提权</button>
+        </form>
+    }
+    else
+    {
+        <a class="btn" href="/elevate">去提权</a>
+    }
+</section>
+
+<section class="panel" style="margin-top:16px">
+    <h2>外观（里主题）</h2>
+    <p class="muted small">只在「里」主题下生效：轻动效、字体、以及你自己传的背景图（存在服务器，不进 git）。</p>
+
+    <form method="post" asp-page-handler="Theme">
+        <label class="field checkbox">
+            <input asp-for="EffectsEnabled" type="checkbox" />
+            <span>启用轻动效（悬浮光晕、渐变背景）</span>
+        </label>
+        <label class="field">
+            <span>字体</span>
+            <select asp-for="FontChoice">
+                <option value="serif">衬线（默认）</option>
+                <option value="sans">无衬线</option>
+                <option value="mono">等宽</option>
+            </select>
+        </label>
+        <button class="btn" type="submit">保存偏好</button>
+    </form>
+
+    <form method="post" asp-page-handler="Background" enctype="multipart/form-data" style="margin-top:14px">
+        <label class="field">
+            <span>背景图（jpg / png / webp / gif，≤ 8MB）</span>
+            <input asp-for="Background" type="file" accept="image/*" />
+        </label>
+        <button class="btn ghost" type="submit">上传背景</button>
+    </form>
+
+    @if (Model.HasBackground)
+    {
+        <form method="post" asp-page-handler="BackgroundRemove" style="margin-top:8px" onsubmit="return confirm('移除背景图？');">
+            <button class="btn ghost" type="submit">移除当前背景</button>
+        </form>
+    }
 </section>
 
 <section class="panel" style="margin-top:16px">
     <h2>修改密码</h2>
-
-    @if (!string.IsNullOrEmpty(Model.Message))
-    {
-        <div class="notice">@Model.Message</div>
-    }
-    @if (!string.IsNullOrEmpty(Model.Error))
-    {
-        <div class="alert">@Model.Error</div>
-    }
 
     <form method="post" asp-page-handler="ChangePassword">
         <label class="field">

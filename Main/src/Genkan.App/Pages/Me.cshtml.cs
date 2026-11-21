@@ -1,6 +1,8 @@
 using System.Security.Claims;
+using Genkan.Backup;
 using Genkan.Data;
 using Genkan.Security;
+using Genkan.Theme;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -11,8 +13,17 @@ namespace Genkan.Pages;
 public class MeModel : PageModel
 {
     private readonly UserRepository _users;
+    private readonly SecretStore _secrets;
+    private readonly ElevationService _elevation;
+    private readonly ThemeService _theme;
 
-    public MeModel(UserRepository users) => _users = users;
+    public MeModel(UserRepository users, SecretStore secrets, ElevationService elevation, ThemeService theme)
+    {
+        _users = users;
+        _secrets = secrets;
+        _elevation = elevation;
+        _theme = theme;
+    }
 
     public UserRecord? Me { get; private set; }
 
@@ -24,6 +35,22 @@ public class MeModel : PageModel
 
     public string? Error { get; private set; }
 
+    public bool TotpEnabled => _secrets.Get("totp.enabled") == "1";
+
+    public string? TotpSecret => _secrets.Get("totp.secret");
+
+    public string? OtpauthUri => TotpSecret is null
+        ? null
+        : Totp.BuildUri(TotpSecret, Me?.Name ?? "manifld", "玄关 Genkan");
+
+    public bool Elevated => Me is not null && _elevation.IsElevated(HttpContext, Me.Id);
+
+    public ThemeSettings ThemeSettings => _theme.Load();
+
+    public bool HasBackground => _theme.HasBackground;
+
+    public long BackgroundVersion => _theme.BackgroundVersion;
+
     [BindProperty]
     public string? OldPassword { get; set; }
 
@@ -33,32 +60,32 @@ public class MeModel : PageModel
     [BindProperty]
     public string? ConfirmPassword { get; set; }
 
+    [BindProperty]
+    public string? TotpCode { get; set; }
+
+    [BindProperty]
+    public bool EffectsEnabled { get; set; }
+
+    [BindProperty]
+    public string FontChoice { get; set; } = "serif";
+
+    [BindProperty]
+    public IFormFile? Background { get; set; }
+
     public void OnGet()
     {
-        var id = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        Me = string.IsNullOrWhiteSpace(id) ? null : _users.FindById(id);
-
-        if (Me is null)
-        {
-            return;
-        }
-
-        CreatedText = Format(Me.CreatedAt);
-        LastLoginText = Format(Me.LastLoginAt);
+        Load();
+        EffectsEnabled = ThemeSettings.Effects;
+        FontChoice = ThemeSettings.Font;
     }
 
     public IActionResult OnPostChangePassword()
     {
-        var id = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        Me = string.IsNullOrWhiteSpace(id) ? null : _users.FindById(id);
-
+        Load();
         if (Me is null)
         {
             return Forbid();
         }
-
-        CreatedText = Format(Me.CreatedAt);
-        LastLoginText = Format(Me.LastLoginAt);
 
         var oldPassword = OldPassword ?? string.Empty;
         var newPassword = NewPassword ?? string.Empty;
@@ -93,6 +120,143 @@ public class MeModel : PageModel
         Message = "密码已更新，下次登录用新密码。";
         OldPassword = NewPassword = ConfirmPassword = null;
         return Page();
+    }
+
+    public IActionResult OnPostTotpBegin()
+    {
+        Load();
+        if (Me is null)
+        {
+            return Forbid();
+        }
+
+        var secret = Totp.GenerateSecret();
+        _secrets.Set("totp.secret", secret);
+        _secrets.Remove("totp.enabled");
+
+        Message = "已生成密钥。把它加进验证器，再输入一次 6 位验证码确认。";
+        return Page();
+    }
+
+    public IActionResult OnPostTotpConfirm()
+    {
+        Load();
+        if (Me is null)
+        {
+            return Forbid();
+        }
+
+        var secret = _secrets.Get("totp.secret");
+        if (string.IsNullOrWhiteSpace(secret))
+        {
+            Error = "还没有生成密钥。";
+            return Page();
+        }
+
+        if (!Totp.Validate(secret, TotpCode))
+        {
+            Error = "验证码不对（注意时间同步）。";
+            return Page();
+        }
+
+        _secrets.Set("totp.enabled", "1");
+        Message = "二次验证已启用。之后提权需要验证器里的验证码。";
+        return Page();
+    }
+
+    public IActionResult OnPostTotpDisable()
+    {
+        Load();
+        if (Me is null)
+        {
+            return Forbid();
+        }
+
+        var secret = _secrets.Get("totp.secret");
+        if (string.IsNullOrWhiteSpace(secret) || !Totp.Validate(secret, TotpCode))
+        {
+            Error = "验证码不对，无法关闭。";
+            return Page();
+        }
+
+        _secrets.Remove("totp.secret");
+        _secrets.Remove("totp.enabled");
+        Message = "二次验证已关闭。";
+        return Page();
+    }
+
+    public IActionResult OnPostTheme()
+    {
+        Load();
+        if (Me is null)
+        {
+            return Forbid();
+        }
+
+        _theme.Save(new ThemeSettings
+        {
+            Effects = EffectsEnabled,
+            Font = string.IsNullOrWhiteSpace(FontChoice) ? "serif" : FontChoice,
+        });
+
+        Message = "外观偏好已保存。";
+        return Page();
+    }
+
+    public async Task<IActionResult> OnPostBackgroundAsync(CancellationToken cancellationToken)
+    {
+        Load();
+        if (Me is null)
+        {
+            return Forbid();
+        }
+
+        if (Background is null)
+        {
+            Error = "没有选择图片。";
+            return Page();
+        }
+
+        var (ok, message) = await _theme.SaveBackgroundAsync(Background, cancellationToken);
+        if (ok) Message = message;
+        else Error = message;
+
+        return Page();
+    }
+
+    public IActionResult OnPostBackgroundRemove()
+    {
+        Load();
+        if (Me is null)
+        {
+            return Forbid();
+        }
+
+        _theme.RemoveBackground();
+        Message = "背景图已移除。";
+        return Page();
+    }
+
+    public IActionResult OnPostDeElevate()
+    {
+        _elevation.Drop(HttpContext);
+        Message = "已退出提权。";
+        Load();
+        return Page();
+    }
+
+    private void Load()
+    {
+        var id = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        Me = string.IsNullOrWhiteSpace(id) ? null : _users.FindById(id);
+
+        if (Me is null)
+        {
+            return;
+        }
+
+        CreatedText = Format(Me.CreatedAt);
+        LastLoginText = Format(Me.LastLoginAt);
     }
 
     private static string Format(string? iso)

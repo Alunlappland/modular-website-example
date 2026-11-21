@@ -1,7 +1,10 @@
 using System.Reflection;
 using System.Security.Claims;
+using System.Text;
+using System.Text.Json;
 using Dapper;
 using Genkan;
+using Genkan.Ai;
 using Genkan.Backup;
 using Genkan.Blog;
 using Genkan.Console;
@@ -9,6 +12,7 @@ using Genkan.Data;
 using Genkan.Files;
 using Genkan.Security;
 using Genkan.Sync;
+using Genkan.Theme;
 using Genkan.Sys;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
@@ -103,6 +107,18 @@ builder.Services.AddSingleton<CloudMirrorService>();
 builder.Services.AddHostedService<BackupScheduler>();
 builder.Services.AddSingleton<SyncService>();
 builder.Services.AddHttpClient("syncthing", client => client.Timeout = TimeSpan.FromSeconds(3));
+
+// AI：供应商目录、密钥托管、对话文件、余额查询
+builder.Services.AddSingleton<AiCatalog>();
+builder.Services.AddSingleton<AiService>();
+builder.Services.AddSingleton<ChatStore>();
+builder.Services.AddHttpClient("ai", client => client.Timeout = TimeSpan.FromMinutes(5));
+
+// 二次验证与临时提权
+builder.Services.AddSingleton<ElevationService>();
+
+// 主题偏好与背景图
+builder.Services.AddSingleton<ThemeService>();
 builder.Services.AddHttpClient("moderation", client => client.Timeout = TimeSpan.FromSeconds(8));
 builder.Services.AddSingleton<SetupState>();
 
@@ -386,6 +402,148 @@ app.MapGet("/api/console/hints", (string? q, int? limit) =>
         Results.Ok(CommandHints.Search(q, Math.Clamp(limit ?? 30, 1, 100))))
     .RequireAuthorization();
 
+// ---------- AI：供应商 / 余额 / 对话 ----------
+app.MapGet("/api/ai/providers", (AiService ai) =>
+        Results.Ok(new
+        {
+            defaultProvider = ai.Catalog.DefaultProvider,
+            providers = ai.Catalog.Providers.Select(provider => new AiProviderView(
+                provider.Id, provider.Name, provider.Kind, provider.Model, ai.HasKey(provider.Id), provider.Enabled)),
+        }))
+    .RequireAuthorization();
+
+app.MapGet("/api/ai/balance", async (AiService ai, CancellationToken cancellationToken) =>
+        Results.Ok(await ai.BalancesAsync(cancellationToken)))
+    .RequireAuthorization();
+
+app.MapPost("/api/ai/keys", (AiKeyRequest request, AiService ai, HttpContext context) =>
+    {
+        if (!context.User.IsInRole("admin"))
+        {
+            return Results.Forbid();
+        }
+
+        if (string.IsNullOrWhiteSpace(request.ProviderId) || string.IsNullOrWhiteSpace(request.Key))
+        {
+            return Results.BadRequest(new { error = "供应商和 Key 都要填。" });
+        }
+
+        ai.SaveKey(request.ProviderId, request.Key);
+        return Results.Ok(new { ok = true });
+    })
+    .RequireAuthorization();
+
+app.MapGet("/api/ai/chats", (ChatStore store, HttpContext context) =>
+    {
+        var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        return Results.Ok(store.List(owner));
+    })
+    .RequireAuthorization();
+
+app.MapGet("/api/ai/chats/{id}", (string id, ChatStore store, HttpContext context) =>
+    {
+        var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        var document = store.Load(owner, id);
+        return document is null ? Results.NotFound() : Results.Ok(document);
+    })
+    .RequireAuthorization();
+
+app.MapDelete("/api/ai/chats/{id}", (string id, ChatStore store, HttpContext context) =>
+    {
+        var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        return store.Delete(owner, id) ? Results.Ok(new { ok = true }) : Results.NotFound();
+    })
+    .RequireAuthorization();
+
+app.MapPost("/api/ai/chat", async (
+        HttpContext context,
+        AiChatRequest request,
+        AiService ai,
+        ChatStore store,
+        CancellationToken cancellationToken) =>
+    {
+        var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        var provider = ai.Catalog.Find(request.ProviderId);
+
+        if (provider is null)
+        {
+            return Results.BadRequest(new { error = "未知的 AI 供应商。" });
+        }
+
+        if (!ai.HasKey(provider.Id))
+        {
+            return Results.BadRequest(new { error = provider.Name + " 还没有配置 API Key，请先到 /ai 的设置里填。" });
+        }
+
+        var incoming = request.Messages ?? new List<ChatMessage>();
+        if (incoming.Count == 0)
+        {
+            return Results.BadRequest(new { error = "消息是空的。" });
+        }
+
+        var document = string.IsNullOrEmpty(request.ChatId) ? null : store.Load(owner, request.ChatId);
+        if (document is null)
+        {
+            document = new ChatDocument
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                Title = FirstLine(incoming.Last().Content, 24),
+                Provider = provider.Id,
+                Model = provider.Model,
+            };
+        }
+
+        var lastUser = incoming.Last();
+        if (lastUser.Role == "user" && !document.Messages.Any(message =>
+                message.Role == "user" && message.Content == lastUser.Content))
+        {
+            document.Messages.Add(lastUser);
+        }
+
+        context.Response.Headers.ContentType = "text/event-stream; charset=utf-8";
+        context.Response.Headers.CacheControl = "no-cache";
+        context.Response.Headers["X-Accel-Buffering"] = "no";
+
+        var builder = new StringBuilder();
+
+        try
+        {
+            await ai.StreamChatAsync(provider, incoming, async delta =>
+            {
+                builder.Append(delta);
+                await context.Response.WriteAsync(
+                    "data: " + JsonSerializer.Serialize(new { text = delta }) + "\n\n",
+                    cancellationToken);
+                await context.Response.Body.FlushAsync(cancellationToken);
+            }, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            // 客户端主动断开
+        }
+        catch (Exception ex)
+        {
+            await context.Response.WriteAsync(
+                "data: " + JsonSerializer.Serialize(new { error = ex.Message }) + "\n\n",
+                cancellationToken);
+        }
+
+        if (builder.Length > 0)
+        {
+            document.Messages.Add(new ChatMessage { Role = "assistant", Content = builder.ToString() });
+            document.Provider = provider.Id;
+            document.Model = provider.Model;
+            store.Save(owner, document);
+        }
+
+        await context.Response.WriteAsync(
+            "data: " + JsonSerializer.Serialize(new { done = true, chatId = document.Id, title = document.Title }) + "\n\n",
+            cancellationToken);
+
+        return Results.Empty;
+    })
+    .RequireAuthorization();
+
 // ---------- 博客：反应 / 行级注释 / 预览 ----------
 app.MapPost("/api/blog/{slug}/react", async (
     string slug,
@@ -547,6 +705,12 @@ app.MapPost("/api/blog/{slug}/annotations/{id:long}/moderate", async (
     return ok ? Results.Json(new { ok = true }) : Results.NotFound();
 });
 
+app.MapGet("/theme/background", (ThemeService theme) =>
+        theme.HasBackground
+            ? Results.File(theme.BackgroundPath, theme.ContentType)
+            : Results.NotFound())
+    .AllowAnonymous();
+
 app.MapRazorPages();
 
 app.Lifetime.ApplicationStarted.Register(() =>
@@ -625,4 +789,14 @@ static string ResolveSiteRoot()
     }
 
     return AppContext.BaseDirectory;
+}
+static string FirstLine(string text, int max)
+{
+    var line = (text ?? string.Empty).Replace('\r', ' ').Replace('\n', ' ').Trim();
+    if (line.Length == 0)
+    {
+        return "新对话";
+    }
+
+    return line.Length <= max ? line : line[..max] + "…";
 }

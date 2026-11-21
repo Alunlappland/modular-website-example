@@ -15,6 +15,7 @@ public class BackupModel : PageModel
     private readonly SecretStore _secrets;
     private readonly BackupService _backup;
     private readonly CloudMirrorService _cloud;
+    private readonly ElevationService _elevation;
     private readonly GenkanPaths _paths;
     private readonly AuditLog _audit;
 
@@ -24,12 +25,14 @@ public class BackupModel : PageModel
         BackupService backup,
         CloudMirrorService cloud,
         GenkanPaths paths,
+        ElevationService elevation,
         AuditLog audit)
     {
         _kopia = kopia;
         _secrets = secrets;
         _backup = backup;
         _cloud = cloud;
+        _elevation = elevation;
         _paths = paths;
         _audit = audit;
     }
@@ -159,6 +162,8 @@ public class BackupModel : PageModel
 
     public async Task<IActionResult> OnPostRestoreAsync()
     {
+        if (!EnsureElevated()) { await LoadAsync(); return Page(); }
+
         var target = Path.Combine(StagingPath, DateTimeOffset.Now.ToString("yyyyMMdd-HHmmss"));
         var (ok, message) = await _backup.RestoreAsync(SnapshotId ?? string.Empty, target, HttpContext.RequestAborted);
 
@@ -172,6 +177,8 @@ public class BackupModel : PageModel
 
     public async Task<IActionResult> OnPostExportKitAsync()
     {
+        if (!EnsureElevated()) { await LoadAsync(); return Page(); }
+
         var password = _secrets.Get("kopia.password");
         if (string.IsNullOrEmpty(password))
         {
@@ -316,6 +323,8 @@ public class BackupModel : PageModel
 
     public async Task<IActionResult> OnPostRetentionAsync()
     {
+        if (!EnsureElevated()) { await LoadAsync(); return Page(); }
+
         _ = Task.Run(async () =>
         {
             try { await _backup.ApplyRetentionAsync(CancellationToken.None); }
@@ -326,6 +335,18 @@ public class BackupModel : PageModel
         Message = "保留策略已在后台执行，稍后刷新看历史里的 retention 记录。";
         await LoadAsync();
         return Page();
+    }
+
+    private bool EnsureElevated()
+    {
+        var id = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
+        if (_elevation.IsElevated(HttpContext, id))
+        {
+            return true;
+        }
+
+        Error = "这个操作需要先提权：去 /elevate 验证一下（15 分钟有效）。";
+        return false;
     }
 
     private async Task LoadAsync()

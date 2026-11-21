@@ -1,0 +1,77 @@
+@page "/elevate"
+@model Genkan.Pages.ElevateModel
+@{
+    ViewData["Title"] = "临时提权";
+}
+
+<section class="panel">
+    <p class="eyebrow">SUDO</p>
+    <h1>临时提权</h1>
+    <p class="muted">
+        提权后 15 分钟内可以做敏感操作：删除旧快照、恢复数据、导出恢复包。过期自动失效。
+    </p>
+
+    @if (!string.IsNullOrEmpty(Model.Message))
+    {
+        <div class="notice">@Model.Message</div>
+    }
+    @if (!string.IsNullOrEmpty(Model.Error))
+    {
+        <div class="alert">@Model.Error</div>
+    }
+
+    <form method="post" asp-route-returnUrl="@Model.ReturnUrl" id="elevate-form">
+        @if (Model.TotpEnabled)
+        {
+            <label class="field">
+                <span>验证器验证码</span>
+                <input asp-for="Code" inputmode="numeric" autocomplete="one-time-code" placeholder="123456" autofocus />
+            </label>
+        }
+        else
+        {
+            <label class="field">
+                <span>账号密码</span>
+                <input asp-for="Password" type="password" autocomplete="current-password" autofocus />
+            </label>
+            <p class="muted small">还没有开启二次验证——建议到 <a class="link" href="/me">我的</a> 里开启。</p>
+        }
+
+        <div class="row">
+            <button class="btn" type="submit">提权 15 分钟</button>
+        </div>
+    </form>
+
+    <form method="post" asp-page-handler="Ring" style="margin-top:14px">
+        <button class="btn ghost" type="submit" id="ring-btn">响铃提醒我</button>
+    </form>
+
+    <p class="muted small">
+        响铃会尝试在服务器上发声；如果站点跑在服务（Session 0）里可能听不到，这时浏览器也会响一声。
+    </p>
+</section>
+
+<script>
+    (function () {
+        const button = document.getElementById('ring-btn');
+        if (!button) return;
+
+        button.addEventListener('click', function () {
+            try {
+                const context = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = context.createOscillator();
+                const gain = context.createGain();
+                oscillator.type = 'sine';
+                oscillator.frequency.value = 880;
+                gain.gain.value = 0.08;
+                oscillator.connect(gain);
+                gain.connect(context.destination);
+                oscillator.start();
+                setTimeout(function () {
+                    oscillator.stop();
+                    context.close();
+                }, 420);
+            } catch (error) { /* 浏览器不允许也就算了 */ }
+        });
+    })();
+</script>
