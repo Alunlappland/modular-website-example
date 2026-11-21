@@ -288,6 +288,16 @@ textarea:focus {
 
 .btn.ghost:hover { color: var(--ink); border-color: var(--ink-faint); filter: none; }
 
+.notice {
+  padding: 10px 13px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, #4f9d69 40%, transparent);
+  background: color-mix(in srgb, #4f9d69 10%, transparent);
+  color: #3f8c5c;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
 .alert {
   padding: 10px 13px;
   border-radius: 10px;

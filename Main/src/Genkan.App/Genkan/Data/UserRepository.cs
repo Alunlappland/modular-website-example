@@ -73,4 +73,16 @@ public sealed class UserRepository
             "UPDATE users SET last_login_at = @at WHERE id = @id",
             new { at = DateTimeOffset.UtcNow.ToString("O"), id });
     }
+
+    public bool UpdatePassword(string id, string salt, string hash, int iterations)
+    {
+        using var connection = _db.Open();
+        return connection.Execute(
+            """
+            UPDATE users
+            SET pwd_salt = @salt, pwd_hash = @hash, pwd_iter = @iterations
+            WHERE id = @id
+            """,
+            new { id, salt, hash, iterations }) > 0;
+    }
 }

@@ -34,3 +34,32 @@
 
     <p class="muted small">提权、二次验证、设备管理会在 M6 接上。</p>
 </section>
+
+<section class="panel" style="margin-top:16px">
+    <h2>修改密码</h2>
+
+    @if (!string.IsNullOrEmpty(Model.Message))
+    {
+        <div class="notice">@Model.Message</div>
+    }
+    @if (!string.IsNullOrEmpty(Model.Error))
+    {
+        <div class="alert">@Model.Error</div>
+    }
+
+    <form method="post" asp-page-handler="ChangePassword">
+        <label class="field">
+            <span>当前密码</span>
+            <input asp-for="OldPassword" type="password" autocomplete="current-password" />
+        </label>
+        <label class="field">
+            <span>新密码（至少 10 位）</span>
+            <input asp-for="NewPassword" type="password" autocomplete="new-password" />
+        </label>
+        <label class="field">
+            <span>再输一次</span>
+            <input asp-for="ConfirmPassword" type="password" autocomplete="new-password" />
+        </label>
+        <button class="btn" type="submit">更新密码</button>
+    </form>
+</section>
