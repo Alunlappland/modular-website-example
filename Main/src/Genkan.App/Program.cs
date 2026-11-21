@@ -448,6 +448,35 @@ app.MapGet("/api/ai/chats/{id}", (string id, ChatStore store, HttpContext contex
     })
     .RequireAuthorization();
 
+app.MapGet("/api/ai/chats/{id}/export", (string id, ChatStore store, HttpContext context) =>
+    {
+        var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        var document = store.Load(owner, id);
+        if (document is null)
+        {
+            return Results.NotFound();
+        }
+
+        var builder = new StringBuilder();
+        builder.AppendLine("# " + document.Title);
+        builder.AppendLine();
+        builder.AppendLine("> " + document.Provider + " · " + document.Model + " · " +
+                           (DateTimeOffset.TryParse(document.CreatedAt, out var created) ? created.ToLocalTime().ToString("yyyy-MM-dd HH:mm") : document.CreatedAt));
+        builder.AppendLine();
+
+        foreach (var message in document.Messages)
+        {
+            builder.AppendLine("## " + (message.Role == "user" ? "我" : "助手"));
+            builder.AppendLine();
+            builder.AppendLine(message.Content);
+            builder.AppendLine();
+        }
+
+        var bytes = Encoding.UTF8.GetBytes(builder.ToString());
+        return Results.File(bytes, "text/markdown; charset=utf-8", document.Title + ".md");
+    })
+    .RequireAuthorization();
+
 app.MapDelete("/api/ai/chats/{id}", (string id, ChatStore store, HttpContext context) =>
     {
         var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";

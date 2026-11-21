@@ -304,6 +304,11 @@
   });
 
   document.getElementById('ai-new').addEventListener('click', newChat);
+  document.getElementById('ai-export-btn').addEventListener('click', () => {
+    if (!state.chatId) { window.alert('先打开一个对话。'); return; }
+    window.location.href = '/api/ai/chats/' + state.chatId + '/export';
+  });
+
   document.getElementById('ai-balance-btn').addEventListener('click', loadBalance);
 
   loadChats();

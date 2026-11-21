@@ -5,6 +5,33 @@
 
 ---
 
+## 2026-11-21 15:45 — AI 统一前端、多供应商余额、TOTP 提权、里主题
+
+**AI（`/ai`）**
+- 一家页面，十家供应商：OpenAI 兼容（DeepSeek / OpenAI / Kimi / GLM / 通义 / 硅基流动 / OpenRouter / 本地 Ollama）、
+  Anthropic、Gemini。Key 存在服务器（SecretStore 加密），浏览器只拿模型名和余额。
+- 两种协议分开适配：
+  - OpenAI：`POST /chat/completions`，`Authorization: Bearer`，解析 `choices[0].delta.content`
+  - Anthropic：`POST /messages`，`x-api-key` + `anthropic-version`，解析 `content_block_delta.delta.text`
+  - Gemini：`models/{model}:streamGenerateContent?alt=sse`，解析 `candidates[0].content.parts[0].text`
+- 对话落盘：`Main/data/chats/<owner>/<id>.json`（user/assistant 全量），列表按更新时间倒序；
+  可导出 Markdown（`/api/ai/chats/{id}/export`）。
+- 余额：DeepSeek、Kimi、硅基流动、OpenRouter 四家真实查询；其余返回「不提供余额接口」而不是假装有数据。
+- 用本地 mock SSE 服务分别验证了两家格式：OpenAI 流拿到「你好，我是 mock。」并落盘；
+  Anthropic 流拿到「[claude] 格式正常」。
+
+**M6**
+- 自实现 TOTP（RFC 6238，Base32 + HMACSHA1），绑定 → 确认 → 关闭；
+- `/elevate` 提权 15 分钟，加密 Cookie（DataProtection），过期自动失效；
+- 删旧快照、恢复、导出恢复包前都要求提权；
+- 响铃：服务器 `MessageBeep` + 浏览器 WebAudio（服务在 Session 0 时听不到服务器那声）。
+- 实测：密码提权成功、`/me` 显示已提权、TOTP 密钥生成后用算出的 6 位码确认启用。
+
+**M7**
+- 里主题：轻动效（悬浮光晕/渐变背景）、字体三选、背景图上传（≤8MB，存 `Main/data/themes`，不进 git）。
+
+---
+
 ## 2026-11-21 15:30 — M6 起步：命令提示器 + 保留清理
 
 **做到哪**
