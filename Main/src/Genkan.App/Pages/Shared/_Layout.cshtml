@@ -27,7 +27,8 @@
     var soonItems = Array.Empty<(string Label, string Glyph)>();
 
     var themeSettings = ThemeService.Load();
-    var hasBackground = ThemeService.HasBackground;
+    // 背景图只给站长本人看：访客和普通成员的页面一律不挂图
+    var hasBackground = ThemeService.HasBackground && authed && isAdmin;
     var effects = theme == "inner" && themeSettings.Effects;
     var bgStyle = hasBackground ? $"--bg-image:url('/theme/background?v={ThemeService.BackgroundVersion}')" : string.Empty;
 }

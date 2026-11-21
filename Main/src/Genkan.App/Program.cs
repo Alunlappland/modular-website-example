@@ -734,11 +734,23 @@ app.MapPost("/api/blog/{slug}/annotations/{id:long}/moderate", async (
     return ok ? Results.Json(new { ok = true }) : Results.NotFound();
 });
 
-app.MapGet("/theme/background", (ThemeService theme) =>
-        theme.HasBackground
-            ? Results.File(theme.BackgroundPath, theme.ContentType)
-            : Results.NotFound())
-    .AllowAnonymous();
+// 背景图是私人内容：只有站长登录后才拿得到，且禁止 CDN/浏览器缓存
+app.MapGet("/theme/background", (HttpContext context, ThemeService theme) =>
+    {
+        if (!context.User.IsInRole("admin"))
+        {
+            return Results.NotFound();
+        }
+
+        if (!theme.HasBackground)
+        {
+            return Results.NotFound();
+        }
+
+        context.Response.Headers.CacheControl = "private, no-store";
+        return Results.File(theme.BackgroundPath, theme.ContentType);
+    })
+    .RequireAuthorization();
 
 app.MapRazorPages();
 
