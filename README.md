@@ -87,7 +87,7 @@ Serilog · kopia · Syncthing · nssm · Cloudflare Tunnel · 纯手写 CSS/JS�
 
 ## 已知限制
 
-- 单文件上传上限 512MB，还没有分块续传；大文件建议走 ZeroTier/EasyTier 内网直连。
+- 上传超过 4MB 会自动分块（2MB/块）以穿过 Cloudflare 的 100 秒限制；上行很慢时仍需要耐心。
 - 备份的保留策略可一键清理，但不会自动定时删（避免误删）。
 - 同步、提权、2FA、主题特效等 M6–M8 内容尚未完成（见 `Docs/PLAN-v0.3-ADDENDUM.md`）。
 
