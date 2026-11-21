@@ -76,6 +76,7 @@ builder.Services.AddSingleton(database);
 // 否则已加密的仓库密码换个账户就解不开。
 builder.Services.AddDataProtection()
     .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(paths.Conf, "keys")))
+    .ProtectKeysWithDpapi(protectToLocalMachine: true)
     .SetApplicationName("Genkan");
 builder.Services.AddSingleton<ExtendRegistry>();
 builder.Services.AddSingleton<ExtendStore>();

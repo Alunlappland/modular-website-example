@@ -20,6 +20,8 @@ public sealed class BackupRun
 
 public sealed record SnapshotInfo(string Id, string Source, string StartTime, long Files, long Bytes, string Tags);
 
+public sealed record RetentionPlan(IReadOnlyList<SnapshotInfo> Keep, IReadOnlyList<SnapshotInfo> Expire);
+
 /// <summary>执行备份、记录历史、列出快照。</summary>
 public sealed class BackupService
 {
@@ -154,6 +156,39 @@ public sealed class BackupService
         var last = LastSuccess("full");
         return last is null ? int.MaxValue : (int)(DateTimeOffset.UtcNow - last.Value).TotalDays;
     }
+
+    /// <summary>
+    /// 保留策略预览：保留最近 6 个 full 恢复点 + 最近 10 天的日快照，其余列为可清理。
+    /// 只做预览，不自动删除。
+    /// </summary>
+    public RetentionPlan PlanRetention(IReadOnlyList<SnapshotInfo> snapshots)
+    {
+        var keep = new List<SnapshotInfo>();
+        var expire = new List<SnapshotInfo>();
+
+        var fullKeep = snapshots
+            .Where(s => IsFull(s))
+            .OrderByDescending(s => s.StartTime, StringComparer.Ordinal)
+            .Take(6)
+            .Select(s => s.Id)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var cutoff = DateTimeOffset.UtcNow.AddDays(-10);
+
+        foreach (var snapshot in snapshots)
+        {
+            var recent = DateTimeOffset.TryParse(snapshot.StartTime, out var at) && at > cutoff;
+            var keepThis = IsFull(snapshot) ? fullKeep.Contains(snapshot.Id) : recent;
+
+            if (keepThis) keep.Add(snapshot);
+            else expire.Add(snapshot);
+        }
+
+        return new RetentionPlan(keep, expire);
+    }
+
+    private static bool IsFull(SnapshotInfo snapshot)
+        => snapshot.Tags.Contains("kind:full", StringComparison.OrdinalIgnoreCase);
 
     public int FullEveryDays => Math.Max(1, _config.GetValue("backup:schedule:fullEveryDays", 10));
 

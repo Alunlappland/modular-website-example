@@ -128,6 +128,42 @@
         </form>
     </section>
 
+    <section class="admin-form" style="margin-bottom:16px">
+        <h2>保留策略（预览）</h2>
+        @if (Model.Retention is null)
+        {
+            <p class="muted">还没有快照。</p>
+        }
+        else
+        {
+            <p class="muted small">
+                保留最近 6 个 full 恢复点 + 最近 10 天的日快照；其余列在下面。
+                这里只做预览，不会自动删除——确认后用 `kopia snapshot delete` 手工清理。
+            </p>
+            <dl class="kv">
+                <div><dt>保留</dt><dd>@Model.Retention.Keep.Count 个</dd></div>
+                <div><dt>可清理</dt><dd>@Model.Retention.Expire.Count 个</dd></div>
+            </dl>
+            @if (Model.Retention.Expire.Count > 0)
+            {
+                <ul class="backup-sources">
+                    @foreach (var snapshot in Model.Retention.Expire.Take(10))
+                    {
+                        <li><code>@snapshot.Id</code> · @snapshot.StartTime</li>
+                    }
+                </ul>
+            }
+        }
+    </section>
+
+    <section class="admin-form" style="margin-bottom:16px">
+        <h2>恢复包</h2>
+        <p class="muted small">把仓库路径、kopia 配置、密码和恢复步骤导出成一个 Markdown 文件（**含明文密码**）。</p>
+        <form method="post" asp-page-handler="ExportKit" onsubmit="return confirm('恢复包里有明文密码，确认导出？');">
+            <button class="btn ghost" type="submit">导出恢复包</button>
+        </form>
+    </section>
+
     <section class="admin-form">
         <h2>历史</h2>
         @if (Model.Runs.Count == 0)

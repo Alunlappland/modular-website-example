@@ -1,3 +1,5 @@
+using System.Text;
+using System.Text.Json;
 using Genkan.Backup;
 using Genkan.Security;
 using Microsoft.AspNetCore.Authorization;
@@ -46,6 +48,8 @@ public class BackupModel : PageModel
     public IReadOnlyList<string> Sources { get; private set; } = Array.Empty<string>();
 
     public IReadOnlyList<SnapshotInfo> Snapshots { get; private set; } = Array.Empty<SnapshotInfo>();
+
+    public RetentionPlan? Retention { get; private set; }
 
     public IReadOnlyList<BackupRun> Runs { get; private set; } = Array.Empty<BackupRun>();
 
@@ -124,6 +128,76 @@ public class BackupModel : PageModel
         return Page();
     }
 
+    public async Task<IActionResult> OnPostExportKitAsync()
+    {
+        var password = _secrets.Get("kopia.password");
+        if (string.IsNullOrEmpty(password))
+        {
+            Error = "还没有保存仓库密码，无法导出恢复包。";
+            await LoadAsync();
+            return Page();
+        }
+
+        var repoPath = ReadRepositoryPath();
+        var kit = new StringBuilder()
+            .AppendLine("# 玄关 · kopia 恢复包")
+            .AppendLine()
+            .AppendLine($"> 生成时间：{DateTimeOffset.Now:yyyy-MM-dd HH:mm}")
+            .AppendLine($"> 仓库类型：filesystem")
+            .AppendLine($"> 仓库路径：`{repoPath}`")
+            .AppendLine($"> kopia 配置：`{_kopia.ConfigPath}`")
+            .AppendLine($"> kopia 程序：`{_kopia.ExePath}`")
+            .AppendLine()
+            .AppendLine("## 仓库密码（明文，请离线保存）")
+            .AppendLine()
+            .AppendLine("```")
+            .AppendLine(password)
+            .AppendLine("```")
+            .AppendLine()
+            .AppendLine("## 恢复步骤")
+            .AppendLine()
+            .AppendLine("1. 安装 kopia（scoop install kopia 或官网安装包）。")
+            .AppendLine("2. 把仓库目录复制回本机（若从网盘恢复）。")
+            .AppendLine("3. 连接仓库：")
+            .AppendLine()
+            .AppendLine("```powershell")
+            .AppendLine($"kopia repository connect filesystem --path \"{repoPath}\" --config-file \"{_kopia.ConfigPath}\"")
+            .AppendLine("```")
+            .AppendLine()
+            .AppendLine("4. 列出快照：`kopia snapshot list --all`")
+            .AppendLine("5. 恢复整份：`kopia restore <快照ID> D:\\restore-target`")
+            .AppendLine()
+            .AppendLine("> 密码泄露等于仓库泄露。建议打印或存进密码管理器，不要留在站点目录里。");
+
+        var file = Path.Combine(_paths.Conf, $"recovery-kit-{DateTimeOffset.Now:yyyyMMdd-HHmmss}.md");
+        await System.IO.File.WriteAllTextAsync(file, kit.ToString(), Encoding.UTF8);
+
+        _audit.Write(HttpContext, "backup.export-kit", "recovery-kit", "ok");
+        Message = "恢复包已导出：" + file + "（含明文密码，请尽快离线保存后删除）。";
+        await LoadAsync();
+        return Page();
+    }
+
+    private string ReadRepositoryPath()
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(System.IO.File.ReadAllText(_kopia.ConfigPath));
+            if (doc.RootElement.TryGetProperty("storage", out var storage) &&
+                storage.TryGetProperty("config", out var config) &&
+                config.TryGetProperty("path", out var path))
+            {
+                return path.GetString() ?? "(未知)";
+            }
+        }
+        catch
+        {
+            // 配置读不出来就显示未知
+        }
+
+        return "(未知)";
+    }
+
     private async Task LoadAsync()
     {
         ExePath = _kopia.ExePath;
@@ -138,5 +212,10 @@ public class BackupModel : PageModel
         Runs = _backup.RecentRuns();
 
         Snapshots = Ready ? await _backup.ListSnapshotsAsync(HttpContext.RequestAborted) : Array.Empty<SnapshotInfo>();
+
+        if (Snapshots.Count > 0)
+        {
+            Retention = _backup.PlanRetention(Snapshots);
+        }
     }
 }
