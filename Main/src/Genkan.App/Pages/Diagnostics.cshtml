@@ -1,0 +1,53 @@
+@page "/diagnostics"
+@model Genkan.Pages.DiagnosticsModel
+@{
+    ViewData["Title"] = "自诊断";
+}
+
+<section class="panel">
+    <div class="panel-head">
+        <span>自诊断 · @Model.CheckedAt</span>
+        <a class="link" href="/diagnostics">重新检查</a>
+    </div>
+
+    <p class="muted small">
+        一次性检查数据库、磁盘、备份、镜像、同步、AI 和日志。只读，不会改动任何东西。
+        @if (Model.FailCount == 0 && Model.WarnCount == 0)
+        {
+            <span class="tag on">全部正常</span>
+        }
+        else
+        {
+            <span class="tag off">@Model.FailCount 项失败 · @Model.WarnCount 项注意</span>
+        }
+    </p>
+
+    <table class="file-table">
+        <thead>
+            <tr><th style="width:120px">项目</th><th style="width:70px">状态</th><th>说明</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var check in Model.Checks)
+            {
+                <tr>
+                    <td>@check.Name</td>
+                    <td>
+                        @if (check.Status == "ok")
+                        {
+                            <span class="tag on">正常</span>
+                        }
+                        else if (check.Status == "warn")
+                        {
+                            <span class="tag">注意</span>
+                        }
+                        else
+                        {
+                            <span class="tag off">失败</span>
+                        }
+                    </td>
+                    <td class="muted">@check.Detail</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</section>

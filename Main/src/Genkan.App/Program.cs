@@ -119,6 +119,9 @@ builder.Services.AddSingleton<ElevationService>();
 
 // 主题偏好与背景图
 builder.Services.AddSingleton<ThemeService>();
+
+// 自诊断
+builder.Services.AddSingleton<DiagnosticsService>();
 builder.Services.AddHttpClient("moderation", client => client.Timeout = TimeSpan.FromSeconds(8));
 builder.Services.AddSingleton<SetupState>();
 
