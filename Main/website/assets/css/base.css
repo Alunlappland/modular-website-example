@@ -424,7 +424,7 @@ textarea:focus {
   }
 }
 
-/* ---- ¡¸Àï¡¹Ö÷ÌâÌØĞ§Óë×Ô¶¨Òå±³¾° ---- */
+/* ---- ï¿½ï¿½ï¿½ï¡¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ğ§ï¿½ï¿½ï¿½Ô¶ï¿½ï¿½å±³ï¿½ï¿½ ---- */
 body.has-bg::before {
   content: "";
   position: fixed;
@@ -474,13 +474,21 @@ html[data-font="sans"] body.app { font-family: "Segoe UI", system-ui, -apple-sys
 }
 .secret { word-break: break-all; font-size: 13px; }
 
-/* ±³¾°×óÓÒÁô°×£¨Ä¬ÈÏ£©£¬¿ÉÓÃ /me ÇĞ»ØÆÌÂú */
+/* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×£ï¿½Ä¬ï¿½Ï£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ /me ï¿½Ğ»ï¿½ï¿½ï¿½ï¿½ï¿½ */
 html[data-bg="inset"] body.has-bg::before {
   inset: 0 clamp(28px, 7vw, 150px);
   border-radius: 22px;
   background-size: cover;
-  opacity: 0.5;
-  box-shadow: 0 30px 80px -60px rgba(0, 0, 0, 0.45);
+  /* è¡¨/ä¸­ä¸»é¢˜ä¸‹å‹å¾—æ›´æ·¡ï¼Œé¿å…å‹è¿‡æ­£æ–‡ */
+  opacity: 0.24;
+  filter: blur(2px) saturate(0.9);
+  box-shadow: 0 30px 80px -60px rgba(0, 0, 0, 0.35);
+}
+
+/* ã€Œé‡Œã€æ‰æŠŠèƒŒæ™¯æ¨åˆ°æ˜æ˜¾çš„ä½ç½® */
+html[data-theme="inner"] body.has-bg::before {
+  opacity: 0.58;
+  filter: blur(1px) saturate(1.02);
 }
 
 html[data-bg="full"] body.has-bg::before {
