@@ -21,6 +21,9 @@ public sealed class GenkanPaths
     public string Themes { get; }
     public string Extend { get; }
 
+    /// <summary>分块上传的临时拼装目录。</summary>
+    public string Uploads { get; }
+
     public GenkanPaths(string root)
     {
         Root = Path.GetFullPath(root).TrimEnd('\\', '/');
@@ -38,6 +41,7 @@ public sealed class GenkanPaths
         Assets = Path.Combine(Website, "assets");
         Themes = Path.Combine(Website, "themes");
         Extend = Path.Combine(Root, "Extend");
+        Uploads = Path.Combine(Depend, "tmp", "uploads");
     }
 
     public void EnsureCreated()
@@ -45,7 +49,7 @@ public sealed class GenkanPaths
         foreach (var dir in new[]
         {
             Main, Src, Bin, Conf, Data, Database, Document, Depend, Logs,
-            Website, Pages, Assets, Themes, Extend,
+            Website, Pages, Assets, Themes, Extend, Uploads,
         })
         {
             Directory.CreateDirectory(dir);

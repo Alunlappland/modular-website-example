@@ -46,7 +46,7 @@
             </div>
             <div class="dropzone-text">
                 <strong>把文件或文件夹拖进来</strong>
-                <span>文件夹会保留目录结构；单次请求建议 ≤ 100MB（Cloudflare 上限），大文件请用 Syncthing 或内网直连。</span>
+                <span>文件夹会保留目录结构；4MB 以上自动分成 2MB 块上传，可穿过隧道的 100 秒限制。</span>
             </div>
             <div class="upload-progress" id="upload-progress" hidden>
                 <div class="bar"><i id="upload-bar" style="width:0%"></i></div>

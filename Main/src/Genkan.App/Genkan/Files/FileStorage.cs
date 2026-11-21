@@ -61,6 +61,29 @@ public sealed class FileStorage
         return savedRelative;
     }
 
+    /// <summary>把分块拼装好的临时文件移动到用户目录，返回相对路径。</summary>
+    public string FinishChunkedUpload(string owner, string? virtualPath, string tempFile)
+    {
+        var dir = OwnerRoot(owner);
+        Directory.CreateDirectory(dir);
+
+        var relative = BuildRelativePath(virtualPath, Path.GetFileName(tempFile) ?? "file");
+        var full = Path.Combine(dir, relative);
+
+        var rootFull = Path.GetFullPath(dir).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        var fullPath = Path.GetFullPath(full);
+        if (!fullPath.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("路径越界。");
+        }
+
+        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+        fullPath = MakeUnique(fullPath);
+        File.Move(tempFile, fullPath);
+
+        return Path.GetRelativePath(dir, fullPath).Replace('\\', '/');
+    }
+
     private static string BuildRelativePath(string? virtualPath, string fallbackName)
     {
         var source = string.IsNullOrWhiteSpace(virtualPath) ? fallbackName : virtualPath;

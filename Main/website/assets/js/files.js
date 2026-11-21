@@ -1,4 +1,4 @@
-/* 文件页：拖拽、上传进度、复制链接 */
+/* 文件页：拖拽、分块上传、复制链接 */
 (function () {
   'use strict';
 
@@ -35,8 +35,47 @@
     });
   }
 
-  // ---- 逐文件上传（每个文件一个请求，失败不影响其它文件）----
+  // ---- 上传：小文件整传，大文件分块（2MB/块，避开 Cloudflare 的 100 秒与 100MB 限制）----
   if (form && input) {
+    const CHUNK_SIZE = 2 * 1024 * 1024;
+    const DIRECT_LIMIT = 4 * 1024 * 1024;
+
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    const randomId = () => {
+      if (window.crypto && window.crypto.randomUUID) {
+        return window.crypto.randomUUID().replace(/-/g, '');
+      }
+      return String(Date.now()) + Math.random().toString(16).slice(2);
+    };
+
+    const handlerUrl = (name) => {
+      const url = new URL(form.action, window.location.href);
+      url.searchParams.set('handler', name);
+      return url.toString();
+    };
+
+    const postForm = (url, data, onProgress) => new Promise((resolve) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', url, true);
+      xhr.setRequestHeader('Accept', 'application/json');
+
+      if (onProgress) {
+        xhr.upload.addEventListener('progress', (event) => {
+          if (event.lengthComputable) onProgress(event.loaded);
+        });
+      }
+
+      xhr.addEventListener('load', () => {
+        let json = null;
+        try { json = JSON.parse(xhr.responseText); } catch (error) { /* 非 JSON 响应 */ }
+        resolve({ status: xhr.status, json });
+      });
+
+      xhr.addEventListener('error', () => resolve({ status: 0, json: null }));
+      xhr.send(data);
+    });
+
     form.addEventListener('submit', (event) => {
       event.preventDefault();
 
@@ -51,8 +90,6 @@
 
       const tokenInput = form.querySelector('input[name="__RequestVerificationToken"]');
       const token = tokenInput ? tokenInput.value : '';
-      const action = form.action;
-
       const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
       let doneBytes = 0;
       let failed = 0;
@@ -63,71 +100,94 @@
         button.textContent = '上传中…';
       }
 
-      const updateProgress = (loadedCurrent, index) => {
-        const overall = totalBytes === 0 ? 0 : Math.round(((doneBytes + loadedCurrent) / totalBytes) * 100);
+      const paint = (fileIndex, currentLoaded) => {
+        const overall = totalBytes === 0 ? 0 : Math.round(((doneBytes + currentLoaded) / totalBytes) * 100);
         if (bar) bar.style.width = overall + '%';
         if (status) {
-          status.textContent = '第 ' + (index + 1) + ' / ' + files.length + ' 个（' + overall + '%）　' +
-            files[index].name;
+          status.textContent = '第 ' + (fileIndex + 1) + ' / ' + files.length + ' 个（' + overall + '%）　' +
+            files[fileIndex].name;
         }
       };
 
-      const uploadOne = (file, index) => new Promise((resolve) => {
+      const uploadDirect = async (file, index) => {
         const data = new FormData();
         data.append('Uploads', file, file.webkitRelativePath || file.name);
         if (token) data.append('__RequestVerificationToken', token);
 
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', action, true);
-        xhr.setRequestHeader('Accept', 'application/json');
+        const result = await postForm(handlerUrl('Upload'), data, (loaded) => paint(index, loaded));
+        if (result.status !== 200 || !result.json || !result.json.ok) {
+          throw new Error('HTTP ' + result.status);
+        }
+      };
 
-        xhr.upload.addEventListener('progress', (e) => {
-          if (e.lengthComputable) updateProgress(e.loaded, index);
-        });
+      const uploadChunked = async (file, index) => {
+        const id = randomId();
+        const relative = file.webkitRelativePath || file.name;
+        let offset = 0;
 
-        xhr.addEventListener('load', () => {
-          doneBytes += file.size;
-          if (xhr.status !== 200) {
-            failed++;
-            if (status) {
-              status.textContent = '「' + file.name + '」失败：HTTP ' + xhr.status +
-                (xhr.status === 520 || xhr.status === 524 ? '（隧道超时/源站不可达，稍后重试）' : '') +
-                '，继续上传其余文件…';
+        while (offset < file.size) {
+          const end = Math.min(offset + CHUNK_SIZE, file.size);
+          const blob = file.slice(offset, end);
+          let advanced = false;
+
+          for (let attempt = 0; attempt < 3 && !advanced; attempt++) {
+            const data = new FormData();
+            data.append('Chunk', blob, 'chunk');
+            data.append('uploadId', id);
+            data.append('offset', String(offset));
+            if (token) data.append('__RequestVerificationToken', token);
+
+            const result = await postForm(handlerUrl('Chunk'), data, (loaded) => paint(index, offset + loaded));
+
+            if (result.status === 200 && result.json && result.json.ok) {
+              offset = end;
+              advanced = true;
+            } else if (result.status === 409 && result.json && typeof result.json.expected === 'number') {
+              // 上次中断过：服务端已有字节数不同，对齐后重发
+              offset = result.json.expected;
+              advanced = true;
+            } else {
+              await sleep(700 * (attempt + 1));
             }
           }
-          updateProgress(0, index);
-          resolve();
-        });
 
-        xhr.addEventListener('error', () => {
-          doneBytes += file.size;
-          failed++;
-          if (status) status.textContent = '「' + file.name + '」网络错误，继续上传其余文件…';
-          resolve();
-        });
+          if (!advanced) throw new Error('分块上传中断');
+          paint(index, offset);
+        }
 
-        xhr.send(data);
-      });
+        const done = new FormData();
+        done.append('uploadId', id);
+        done.append('fileName', relative);
+        done.append('totalBytes', String(file.size));
+        if (token) done.append('__RequestVerificationToken', token);
+
+        const result = await postForm(handlerUrl('Complete'), done);
+        if (result.status !== 200 || !result.json || !result.json.ok) {
+          throw new Error('合并失败（HTTP ' + result.status + '）');
+        }
+      };
 
       (async () => {
         for (let i = 0; i < files.length; i++) {
-          // Cloudflare 单请求上限约 100MB，超了必然失败，直接跳过并提示
-          if (files[i].size > 95 * 1024 * 1024) {
-            failed++;
-            doneBytes += files[i].size;
-            if (status) {
-              status.textContent = '「' + files[i].name + '」超过 95MB，已跳过（请改用 Syncthing 或内网传输）';
+          const file = files[i];
+          try {
+            if (file.size >= DIRECT_LIMIT) {
+              await uploadChunked(file, i);
+            } else {
+              await uploadDirect(file, i);
             }
-            continue;
+          } catch (error) {
+            failed++;
+            if (status) status.textContent = '「' + file.name + '」失败：' + error.message + '，继续…';
           }
-
-          await uploadOne(files[i], i);
+          doneBytes += file.size;
+          paint(i, 0);
         }
 
         if (status) {
           status.textContent = failed === 0
-            ? '全部上传完成（' + files.length + ' 个），正在刷新…'
-            : '完成，其中 ' + failed + ' 个失败，正在刷新…';
+            ? '全部完成（' + files.length + ' 个），正在刷新…'
+            : '完成，' + failed + ' 个失败，正在刷新…';
         }
 
         setTimeout(() => window.location.reload(), 800);
