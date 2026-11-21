@@ -10,6 +10,7 @@ using Genkan.Security;
 using Genkan.Sys;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -70,6 +71,12 @@ database.EnsureSchema();
 
 builder.Services.AddSingleton(paths);
 builder.Services.AddSingleton(database);
+
+// 密钥环固定放在 conf\keys：控制台运行与 LocalSystem 服务都读同一份，
+// 否则已加密的仓库密码换个账户就解不开。
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(paths.Conf, "keys")))
+    .SetApplicationName("Genkan");
 builder.Services.AddSingleton<ExtendRegistry>();
 builder.Services.AddSingleton<ExtendStore>();
 builder.Services.AddSingleton<SysMonitor>();
