@@ -39,12 +39,19 @@ public sealed class BackupScheduler : BackgroundService
             try
             {
                 var now = DateTimeOffset.Now;
-                var todayRun = _backup.LastSuccess("daily");
-                var todayFull = _backup.LastSuccess("full");
+                var time = _backup.DailyTime;
+                var scheduledToday = new DateTimeOffset(now.Year, now.Month, now.Day, time.Hours, time.Minutes, 0, now.Offset);
 
-                var dueToday = now.TimeOfDay >= _backup.DailyTime
-                               && (todayRun is null || todayRun.Value.ToLocalTime().Date < now.Date)
-                               && (todayFull is null || todayFull.Value.ToLocalTime().Date < now.Date);
+                var lastDaily = _backup.LastSuccess("daily");
+                var lastFull = _backup.LastSuccess("full");
+                var lastSuccess = new[] { lastDaily, lastFull }
+                    .Where(value => value.HasValue)
+                    .Select(value => value!.Value)
+                    .DefaultIfEmpty(DateTimeOffset.MinValue)
+                    .Max();
+
+                // 只要今天 12:00 之后还没有成功快照，就应该跑（手动提前跑过不影响）
+                var dueToday = now >= scheduledToday && lastSuccess < scheduledToday;
 
                 if (dueToday)
                 {

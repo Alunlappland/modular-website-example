@@ -128,7 +128,7 @@ public sealed class CloudMirrorService
         var result = await RunAsync(arguments, cancellationToken, 1800);
 
         var message = result.Ok
-            ? "镜像完成：" + FirstLine(result.StdOut)
+            ? "镜像完成" + (Summarize(result) is { Length: > 0 } summary ? "：" + summary : string.Empty)
             : (FirstLine(result.StdErr) is { Length: > 0 } line ? line : "镜像失败。");
 
         _backup.EndExternalRun(runId, result.Ok, result.Ok ? null : message, Truncate(result.Combined, 8000));
@@ -228,6 +228,16 @@ public sealed class CloudMirrorService
 
     private static string FirstLine(string text)
         => text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault() ?? string.Empty;
+
+    /// <summary>rclone 的统计行写在 stderr，取最后一行非空内容作为摘要。</summary>
+    private static string Summarize(KopiaResult result)
+    {
+        var lines = string.Join('\n', new[] { result.StdOut, result.StdErr })
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        return lines.LastOrDefault(line => line.Contains("Transferred", StringComparison.OrdinalIgnoreCase))
+               ?? lines.LastOrDefault() ?? string.Empty;
+    }
 
     private static string Truncate(string text, int max)
         => text.Length <= max ? text : text[..max] + "…";
