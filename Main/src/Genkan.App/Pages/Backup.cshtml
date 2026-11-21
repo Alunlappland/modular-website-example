@@ -2,6 +2,11 @@
 @model Genkan.Pages.BackupModel
 @{
     ViewData["Title"] = "备份";
+    if (Model.Busy)
+    {
+        // 后台任务进行中：每 10 秒自动刷新一次
+        HttpContext.Response.Headers["Refresh"] = "10";
+    }
 }
 <link rel="stylesheet" href="/assets/css/admin.css" />
 
@@ -24,6 +29,11 @@
     @if (!string.IsNullOrEmpty(Model.Error))
     {
         <div class="alert">@Model.Error</div>
+    }
+
+    @if (Model.Busy)
+    {
+        <div class="notice">备份进行中，本页每 10 秒自动刷新。</div>
     }
 
     <section class="admin-form" style="margin-bottom:16px">

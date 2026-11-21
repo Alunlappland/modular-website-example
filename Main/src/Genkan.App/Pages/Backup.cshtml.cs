@@ -59,6 +59,8 @@ public class BackupModel : PageModel
 
     public int DaysSinceFull => _backup.DaysSinceLastFull();
 
+    public bool Busy => _backup.Busy;
+
     public string StagingPath => Path.Combine(_paths.Data, "restore-staging");
 
     [BindProperty]
@@ -105,12 +107,29 @@ public class BackupModel : PageModel
     public async Task<IActionResult> OnPostRunAsync(string kind)
     {
         var normalized = kind is "full" ? "full" : "daily";
-        var (ok, message) = await _backup.RunAsync(normalized, HttpContext.RequestAborted);
 
-        if (ok) Message = message;
-        else Error = message;
+        if (_backup.Busy)
+        {
+            Message = "已经有备份在跑，等它结束。";
+            await LoadAsync();
+            return Page();
+        }
 
-        _audit.Write(HttpContext, "backup.run", normalized, ok ? "ok" : "fail");
+        // 不绑定 HTTP 请求：刷新/关页面不会中断 kopia
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _backup.RunAsync(normalized, CancellationToken.None);
+            }
+            catch
+            {
+                // 失败已写进 backup_runs
+            }
+        });
+
+        _audit.Write(HttpContext, "backup.run", normalized, "started");
+        Message = "备份已在后台开始，约十几秒后刷新本页看历史。";
         await LoadAsync();
         return Page();
     }
