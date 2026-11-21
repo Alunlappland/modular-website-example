@@ -57,21 +57,25 @@ else {
     Start-Process -FilePath (Join-Path $live 'Genkan.exe') -WindowStyle Hidden
 }
 
-Start-Sleep -Seconds 3
+Start-Sleep -Seconds 2
 
 $healthy = $false
-try {
-    $client = New-Object System.Net.Sockets.TcpClient('127.0.0.1', 8080)
-    $stream = $client.GetStream()
-    $bytes = [Text.Encoding]::ASCII.GetBytes("GET /healthz HTTP/1.1`r`nHost: localhost`r`nConnection: close`r`n`r`n")
-    $stream.Write($bytes, 0, $bytes.Length)
-    $stream.Flush()
-    $text = (New-Object System.IO.StreamReader($stream)).ReadToEnd()
-    $client.Close()
-    $healthy = $text -match '200 OK'
-}
-catch {
-    $healthy = $false
+for ($attempt = 1; $attempt -le 10; $attempt++) {
+    try {
+        $client = New-Object System.Net.Sockets.TcpClient('127.0.0.1', 8080)
+        $stream = $client.GetStream()
+        $bytes = [Text.Encoding]::ASCII.GetBytes("GET /healthz HTTP/1.1`r`nHost: localhost`r`nConnection: close`r`n`r`n")
+        $stream.Write($bytes, 0, $bytes.Length)
+        $stream.Flush()
+        $text = (New-Object System.IO.StreamReader($stream)).ReadToEnd()
+        $client.Close()
+        if ($text -match '200 OK') { $healthy = $true; break }
+    }
+    catch {
+        $healthy = $false
+    }
+
+    Start-Sleep -Seconds 2
 }
 
 if ($healthy) {
@@ -82,7 +86,8 @@ if ($healthy) {
 
 Write-Host '✗ 启动后健康检查失败，正在回滚 ...' -ForegroundColor Red
 if ($service) { Stop-Service $ServiceName -ErrorAction SilentlyContinue }
-if (Test-Path $live) { Remove-Item $live -Recurse -Force -ErrorAction SilentlyContinue }
+if (Test-Path (Join-Path $root 'Main\bin.failed')) { Remove-Item (Join-Path $root 'Main\bin.failed') -Recurse -Force }
+if (Test-Path $live) { Move-Item $live (Join-Path $root 'Main\bin.failed') -Force }
 Rename-Item $old $live
 if ($service) { Start-Service $ServiceName -ErrorAction SilentlyContinue }
-throw '已回滚到上一版本，请检查 Main\logs 下的日志。'
+throw '已回滚到上一版本；失败版本的产物保留在 Main\bin.failed，请检查 Main\logs 和事件日志。'

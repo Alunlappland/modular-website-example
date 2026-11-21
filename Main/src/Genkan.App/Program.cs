@@ -29,11 +29,10 @@ var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 {
     Args = args,
     ContentRootPath = siteRoot,
+    // 让 Razor 的 asp-append-version 能找到 Main\website 下的静态资源
+    WebRootPath = Path.Combine(siteRoot, "Main", "website"),
     ApplicationName = "Genkan",
 });
-
-// 让 Razor 的 asp-append-version 能找到 Main\website 下的静态资源
-builder.WebHost.UseWebRoot("Main/website");
 
 builder.Configuration.AddJsonFile(
     Path.Combine(paths.Conf, "appsettings.json"),
@@ -41,7 +40,12 @@ builder.Configuration.AddJsonFile(
     reloadOnChange: true);
 
 var configuredUrls = builder.Configuration["server:urls"];
-if (!string.IsNullOrWhiteSpace(configuredUrls))
+var commandLineHasUrls = args.Any(argument =>
+    argument.Equals("--urls", StringComparison.OrdinalIgnoreCase) ||
+    argument.StartsWith("--urls=", StringComparison.OrdinalIgnoreCase));
+
+// 命令行 --urls 优先于配置文件，方便临时换端口调试
+if (!commandLineHasUrls && !string.IsNullOrWhiteSpace(configuredUrls))
 {
     builder.WebHost.UseUrls(configuredUrls);
 }
