@@ -72,7 +72,8 @@ public sealed class CloudMirrorService
         }
 
         WriteConfig();
-        return await RunAsync(new[] { "lsd", $"{Remote}:" }, cancellationToken, 60);
+        // 桶级 token 没有 ListBuckets 权限，测桶而不是账号根
+        return await RunAsync(new[] { "lsd", $"{Remote}:{Bucket}" }, cancellationToken, 60);
     }
 
     public async Task<(bool Ok, string Message)> MirrorAsync(CancellationToken cancellationToken)
@@ -179,6 +180,13 @@ public sealed class CloudMirrorService
             return new KopiaResult(-1, string.Empty, "找不到 rclone.exe：" + RclonePath);
         }
 
+        var argumentList = arguments.ToList();
+        if (!argumentList.Contains("--config"))
+        {
+            argumentList.Add("--config");
+            argumentList.Add(ConfigPath);
+        }
+
         var start = new ProcessStartInfo(RclonePath)
         {
             RedirectStandardOutput = true,
@@ -188,7 +196,7 @@ public sealed class CloudMirrorService
             WorkingDirectory = _paths.Root,
         };
 
-        foreach (var argument in arguments)
+        foreach (var argument in argumentList)
         {
             start.ArgumentList.Add(argument);
         }
