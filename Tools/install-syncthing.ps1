@@ -5,7 +5,7 @@ param(
     [string]$Nssm = 'C:\regser\nssm.exe'
 )
 
-$ErrorActionPreference = 'Stop'
+$ErrorActionPreference = 'Continue'
 $root = Split-Path -Parent $PSScriptRoot
 
 $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
@@ -30,8 +30,10 @@ if (-not (Test-Path $Nssm)) { throw "找不到 nssm：$Nssm" }
 Write-Host '→ 注册服务 ...' -ForegroundColor Cyan
 & $Nssm stop $ServiceName 2>$null | Out-Null
 & $Nssm remove $ServiceName confirm 2>$null | Out-Null
+Start-Sleep -Seconds 1
 
 & $Nssm install $ServiceName $shim
+if ($LASTEXITCODE -ne 0) { throw "nssm install 失败（$LASTEXITCODE）" }
 & $Nssm set $ServiceName AppParameters "serve --home=`"$syncthingHome`" --no-browser --no-restart"
 & $Nssm set $ServiceName AppDirectory $syncthingHome
 & $Nssm set $ServiceName DisplayName 'Syncthing'
@@ -44,8 +46,15 @@ Write-Host '→ 注册服务 ...' -ForegroundColor Cyan
 & $Nssm set $ServiceName AppRotateBytes 10485760
 
 Write-Host '→ 启动 ...' -ForegroundColor Cyan
-Start-Service $ServiceName
-Start-Sleep -Seconds 8
+Start-Service $ServiceName -ErrorAction SilentlyContinue
+Start-Sleep -Seconds 10
+
+$service = Get-Service $ServiceName -ErrorAction SilentlyContinue
+if (-not $service -or $service.Status -ne 'Running') {
+    $errLog = Join-Path $logs 'syncthing.err.log'
+    if (Test-Path $errLog) { Get-Content $errLog -Tail 10 }
+    throw "Syncthing 服务没有起来（状态：$($service.Status)），看 $errLog"
+}
 
 $config = Join-Path $syncthingHome 'config.xml'
 $apiKey = ''
