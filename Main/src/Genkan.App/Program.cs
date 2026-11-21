@@ -32,6 +32,9 @@ var builder = WebApplication.CreateBuilder(new WebApplicationOptions
     ApplicationName = "Genkan",
 });
 
+// 让 Razor 的 asp-append-version 能找到 Main\website 下的静态资源
+builder.WebHost.UseWebRoot("Main/website");
+
 builder.Configuration.AddJsonFile(
     Path.Combine(paths.Conf, "appsettings.json"),
     optional: true,
@@ -205,6 +208,11 @@ app.UseStaticFiles(new StaticFileOptions
 {
     FileProvider = new PhysicalFileProvider(paths.Website),
     RequestPath = string.Empty,
+    OnPrepareResponse = context =>
+    {
+        // 每次都向服务器确认（配合 asp-append-version 的 ?v=哈希），避免旧 JS/CSS 卡住功能
+        context.Context.Response.Headers.CacheControl = "no-cache, must-revalidate";
+    },
 });
 
 // 健康检查（匿名）

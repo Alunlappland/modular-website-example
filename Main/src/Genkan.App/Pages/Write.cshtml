@@ -6,7 +6,7 @@
     var csrf = Antiforgery.GetAndStoreTokens(HttpContext).RequestToken;
 }
 <meta name="csrf" content="@csrf" />
-<link rel="stylesheet" href="/assets/css/blog.css" />
+<link rel="stylesheet" href="/assets/css/blog.css" asp-append-version="true" />
 
 <section class="writer">
     <header class="writer-head">
@@ -70,4 +70,4 @@
     </form>
 </section>
 
-<script src="/assets/js/blog.js"></script>
+<script src="/assets/js/blog.js" asp-append-version="true"></script>
