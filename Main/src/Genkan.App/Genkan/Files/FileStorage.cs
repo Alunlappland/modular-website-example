@@ -27,21 +27,79 @@ public sealed class FileStorage
     public string OwnerRoot(string owner) => Path.Combine(_paths.Data, "files", SafeSegment(owner));
 
     public async Task<string> SaveUploadAsync(string owner, IFormFile file, CancellationToken cancellationToken)
+        => await SaveUploadAsync(owner, file, file.FileName, cancellationToken);
+
+    /// <summary>
+    /// 保存上传文件。<paramref name="virtualPath"/> 可以带子目录（文件夹上传时浏览器会给相对路径），
+    /// 每一段都会清洗，最终路径强制限定在用户目录内。
+    /// </summary>
+    public async Task<string> SaveUploadAsync(string owner, IFormFile file, string? virtualPath, CancellationToken cancellationToken)
     {
         var dir = OwnerRoot(owner);
         Directory.CreateDirectory(dir);
 
-        var name = SafeFileName(file.FileName);
-        var relative = UniqueRelative(dir, name);
+        var relative = BuildRelativePath(virtualPath, file.FileName);
         var full = Path.Combine(dir, relative);
 
-        await using (var stream = File.Create(full))
+        var rootFull = Path.GetFullPath(dir).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        var fullPath = Path.GetFullPath(full);
+        if (!fullPath.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("路径越界。");
+        }
+
+        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+        fullPath = MakeUnique(fullPath);
+
+        await using (var stream = File.Create(fullPath))
         {
             await file.CopyToAsync(stream, cancellationToken);
         }
 
-        _logger.LogInformation("文件已保存：{Owner}/{Relative}（{Size} 字节）", owner, relative, file.Length);
-        return relative;
+        var savedRelative = Path.GetRelativePath(dir, fullPath).Replace('\\', '/');
+        _logger.LogInformation("文件已保存：{Owner}/{Relative}（{Size} 字节）", owner, savedRelative, file.Length);
+        return savedRelative;
+    }
+
+    private static string BuildRelativePath(string? virtualPath, string fallbackName)
+    {
+        var source = string.IsNullOrWhiteSpace(virtualPath) ? fallbackName : virtualPath;
+        var segments = source
+            .Replace('\\', '/')
+            .Split('/', StringSplitOptions.RemoveEmptyEntries)
+            .Select(SafeFileName)
+            .Where(segment => segment.Length > 0 && segment != "." && segment != "..")
+            .ToArray();
+
+        if (segments.Length == 0)
+        {
+            return "file";
+        }
+
+        return string.Join('/', segments);
+    }
+
+    private static string MakeUnique(string fullPath)
+    {
+        if (!File.Exists(fullPath))
+        {
+            return fullPath;
+        }
+
+        var directory = Path.GetDirectoryName(fullPath)!;
+        var stem = Path.GetFileNameWithoutExtension(fullPath);
+        var extension = Path.GetExtension(fullPath);
+
+        for (var index = 1; index < 1000; index++)
+        {
+            var candidate = Path.Combine(directory, $"{stem} ({index}){extension}");
+            if (!File.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        return Path.Combine(directory, $"{stem}-{Guid.NewGuid():N}{extension}");
     }
 
     public async Task<string> SaveToDropAsync(ShareRow share, IFormFile file, CancellationToken cancellationToken)
@@ -116,7 +174,7 @@ public sealed class FileStorage
 
     public static string SafeFileName(string? name)
     {
-        var value = Path.GetFileName(name ?? string.Empty).Trim();
+        var value = Path.GetFileName((name ?? string.Empty).Trim());
         if (string.IsNullOrWhiteSpace(value))
         {
             value = "file";

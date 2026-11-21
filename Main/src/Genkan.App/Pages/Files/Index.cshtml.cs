@@ -31,6 +31,11 @@ public class IndexModel : PageModel
     public IFormFile? Upload { get; set; }
 
     [BindProperty]
+    public List<IFormFile>? Uploads { get; set; }
+
+    public int FileCount => Files.Count;
+
+    [BindProperty]
     public int? ShareDays { get; set; } = 7;
 
     [BindProperty]
@@ -51,41 +56,78 @@ public class IndexModel : PageModel
 
     public async Task<IActionResult> OnPostUploadAsync(CancellationToken cancellationToken)
     {
-        if (Upload is null || Upload.Length == 0)
+        var incoming = new List<IFormFile>();
+        if (Uploads is { Count: > 0 })
+        {
+            incoming.AddRange(Uploads);
+        }
+        if (Upload is { Length: > 0 })
+        {
+            incoming.Add(Upload);
+        }
+
+        incoming = incoming.Where(file => file.Length > 0).ToList();
+        var wantsJson = (Request.Headers.Accept.ToString() ?? string.Empty)
+            .Contains("application/json", StringComparison.OrdinalIgnoreCase);
+
+        if (incoming.Count == 0)
         {
             Error = "没有选择文件。";
             Load();
-            return Page();
-        }
-
-        if (Upload.Length > 512L * 1024 * 1024)
-        {
-            Error = "单个文件最大 512MB。";
-            Load();
-            return Page();
+            return wantsJson ? new JsonResult(new { ok = false, message = Error }) : Page();
         }
 
         var owner = OwnerId;
-        var relative = await _storage.SaveUploadAsync(owner, Upload, cancellationToken);
-        var full = _storage.FullPath(owner, relative);
-        var sha = await FileStorage.ComputeSha256Async(full, cancellationToken);
+        var saved = 0;
+        var failed = new List<string>();
 
-        _repository.AddFile(new FileRow
+        foreach (var file in incoming)
         {
-            Id = Guid.NewGuid().ToString("N"),
-            Owner = owner,
-            Name = Path.GetFileName(relative),
-            RelPath = relative,
-            Size = new FileInfo(full).Length,
-            Sha256 = sha,
-            Mime = Upload.ContentType,
-            CreatedAt = DateTimeOffset.UtcNow.ToString("O"),
-        });
+            try
+            {
+                if (file.Length > 512L * 1024 * 1024)
+                {
+                    failed.Add(file.FileName + "（超过 512MB）");
+                    continue;
+                }
 
-        _audit.Write(HttpContext, "files.upload", relative, "ok");
-        Message = "上传完成：" + Path.GetFileName(relative);
+                var relative = await _storage.SaveUploadAsync(owner, file, file.FileName, cancellationToken);
+                var full = _storage.FullPath(owner, relative);
+                var sha = await FileStorage.ComputeSha256Async(full, cancellationToken);
+
+                _repository.AddFile(new FileRow
+                {
+                    Id = Guid.NewGuid().ToString("N"),
+                    Owner = owner,
+                    Name = relative,
+                    RelPath = relative,
+                    Size = new FileInfo(full).Length,
+                    Sha256 = sha,
+                    Mime = file.ContentType,
+                    CreatedAt = DateTimeOffset.UtcNow.ToString("O"),
+                });
+
+                saved++;
+            }
+            catch (Exception ex)
+            {
+                failed.Add(file.FileName + "：" + ex.Message);
+            }
+        }
+
+        _audit.Write(HttpContext, "files.upload", saved + " files", failed.Count == 0 ? "ok" : "partial");
+        Message = saved + " 个文件已上传" + (failed.Count > 0 ? $"，{failed.Count} 个失败" : string.Empty);
+
+        if (failed.Count > 0)
+        {
+            Error = string.Join("；", failed.Take(3));
+        }
+
         Load();
-        return Page();
+
+        return wantsJson
+            ? new JsonResult(new { ok = failed.Count == 0, message = Message, saved, failed = failed.Take(5).ToArray() })
+            : Page();
     }
 
     public bool IsMissing(FileRow file) => !_storage.Exists(file);

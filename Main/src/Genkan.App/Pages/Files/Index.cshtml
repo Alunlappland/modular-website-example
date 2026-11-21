@@ -33,12 +33,25 @@
 
     <section class="panel dropzone" id="dropzone">
         <form method="post" enctype="multipart/form-data" asp-page-handler="Upload" id="upload-form">
-            <input type="file" name="Upload" id="upload-input" />
-            <div class="dropzone-text">
-                <strong>把文件拖进来</strong>
-                <span>或者点上面的按钮选文件</span>
+            <div class="upload-row">
+                <label class="file-pick">
+                    <input type="file" name="Uploads" id="upload-input" multiple />
+                    <span>选择文件</span>
+                </label>
+                <label class="file-pick">
+                    <input type="file" name="Uploads" id="upload-folder" webkitdirectory directory multiple />
+                    <span>选择文件夹</span>
+                </label>
+                <button class="btn" type="submit" id="upload-btn">上传</button>
             </div>
-            <button class="btn" type="submit">上传</button>
+            <div class="dropzone-text">
+                <strong>把文件或文件夹拖进来</strong>
+                <span>文件夹会保留目录结构；单次请求建议 ≤ 100MB（Cloudflare 上限），大文件请用 Syncthing 或内网直连。</span>
+            </div>
+            <div class="upload-progress" id="upload-progress" hidden>
+                <div class="bar"><i id="upload-bar" style="width:0%"></i></div>
+                <p class="win-sub" id="upload-status"></p>
+            </div>
         </form>
     </section>
 
