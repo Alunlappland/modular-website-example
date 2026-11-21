@@ -38,7 +38,8 @@ public sealed class AiService
         AiProvider provider,
         IReadOnlyList<ChatMessage> messages,
         Func<string, Task> onDelta,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? model = null)
     {
         var key = KeyOf(provider.Id);
         if (string.IsNullOrWhiteSpace(key))
@@ -51,13 +52,13 @@ public sealed class AiService
         switch (provider.Kind.ToLowerInvariant())
         {
             case "anthropic":
-                await StreamAnthropicAsync(client, provider, key, messages, onDelta, cancellationToken);
+                await StreamAnthropicAsync(client, provider, key, messages, onDelta, cancellationToken, model);
                 break;
             case "gemini":
-                await StreamGeminiAsync(client, provider, key, messages, onDelta, cancellationToken);
+                await StreamGeminiAsync(client, provider, key, messages, onDelta, cancellationToken, model);
                 break;
             default:
-                await StreamOpenAiAsync(client, provider, key, messages, onDelta, cancellationToken);
+                await StreamOpenAiAsync(client, provider, key, messages, onDelta, cancellationToken, model);
                 break;
         }
     }
@@ -68,11 +69,12 @@ public sealed class AiService
         string key,
         IReadOnlyList<ChatMessage> messages,
         Func<string, Task> onDelta,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? model)
     {
         var payload = new
         {
-            model = provider.Model,
+            model = string.IsNullOrWhiteSpace(model) ? provider.Model : model,
             stream = true,
             messages = messages.Select(message => new { role = message.Role, content = message.Content }).ToArray(),
         };
@@ -131,11 +133,12 @@ public sealed class AiService
         string key,
         IReadOnlyList<ChatMessage> messages,
         Func<string, Task> onDelta,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? model)
     {
         var payload = new
         {
-            model = provider.Model,
+            model = string.IsNullOrWhiteSpace(model) ? provider.Model : model,
             max_tokens = 4096,
             stream = true,
             messages = messages
@@ -198,7 +201,8 @@ public sealed class AiService
         string key,
         IReadOnlyList<ChatMessage> messages,
         Func<string, Task> onDelta,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? model)
     {
         var contents = messages
             .Where(message => message.Role is "user" or "assistant")
@@ -209,7 +213,7 @@ public sealed class AiService
             })
             .ToArray();
 
-        var url = $"{provider.BaseUrl}/models/{provider.Model}:streamGenerateContent?alt=sse&key={Uri.EscapeDataString(key)}";
+        var url = $"{provider.BaseUrl}/models/{(string.IsNullOrWhiteSpace(model) ? provider.Model : model)}:streamGenerateContent?alt=sse&key={Uri.EscapeDataString(key)}";
         using var request = new HttpRequestMessage(HttpMethod.Post, url)
         {
             Content = new StringContent(JsonSerializer.Serialize(new { contents }), Encoding.UTF8, "application/json"),

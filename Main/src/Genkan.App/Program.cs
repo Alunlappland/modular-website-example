@@ -547,7 +547,7 @@ app.MapPost("/api/ai/chat", async (
                     "data: " + JsonSerializer.Serialize(new { text = delta }) + "\n\n",
                     cancellationToken);
                 await context.Response.Body.FlushAsync(cancellationToken);
-            }, cancellationToken);
+            }, cancellationToken, request.Model);
         }
         catch (OperationCanceledException)
         {
@@ -564,7 +564,7 @@ app.MapPost("/api/ai/chat", async (
         {
             document.Messages.Add(new ChatMessage { Role = "assistant", Content = builder.ToString() });
             document.Provider = provider.Id;
-            document.Model = provider.Model;
+            document.Model = string.IsNullOrWhiteSpace(request.Model) ? provider.Model : request.Model;
             store.Save(owner, document);
         }
 

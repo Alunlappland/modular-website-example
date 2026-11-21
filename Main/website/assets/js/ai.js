@@ -13,10 +13,13 @@
   const chatsList = document.getElementById('ai-chats');
   const balanceBox = document.getElementById('ai-balance');
   const settings = document.getElementById('ai-settings');
+  const modelInput = document.getElementById('ai-model');
 
   const state = {
     chatId: null,
     provider: shell.dataset.default || 'deepseek',
+    model: '',
+    controller: null,
     messages: [],
     busy: false,
   };
@@ -135,8 +138,18 @@
 
   function setBusy(busy) {
     state.busy = busy;
-    send.disabled = busy;
-    send.textContent = busy ? '思考中…' : '发送';
+    send.textContent = busy ? '停止' : '发送';
+  }
+
+  function modelFor(provider) {
+    try { return localStorage.getItem('genkan.ai.model.' + provider) || ''; } catch (error) { return ''; }
+  }
+
+  function rememberModel(provider, value) {
+    try {
+      if (value) localStorage.setItem('genkan.ai.model.' + provider, value);
+      else localStorage.removeItem('genkan.ai.model.' + provider);
+    } catch (error) { /* 隐私模式下忽略 */ }
   }
 
   async function sendMessage() {
@@ -159,12 +172,16 @@
     setBusy(true);
 
     try {
+      state.controller = new AbortController();
+
       const response = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+        signal: state.controller.signal,
         body: JSON.stringify({
           providerId: state.provider,
           chatId: state.chatId,
+          model: state.model || undefined,
           messages: state.messages.slice(-40),
         }),
       });
@@ -212,17 +229,41 @@
       state.messages.push({ role: 'assistant', content: assistantNode.textContent });
       await loadChats();
     } catch (error) {
-      assistantNode.textContent = '⚠️ ' + error.message;
-      assistantNode.classList.add('error');
+      if (error.name === 'AbortError') {
+        if (!assistantNode.textContent) assistantNode.textContent = '（已停止）';
+      } else {
+        assistantNode.textContent = '⚠️ ' + error.message;
+        assistantNode.classList.add('error');
+      }
     } finally {
+      state.controller = null;
       assistantNode.classList.remove('streaming');
       setBusy(false);
       textarea.focus();
+
+      if (assistantNode.textContent) {
+        const copy = el('button', 'ai-copy', '复制');
+        copy.type = 'button';
+        copy.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(assistantNode.textContent);
+            copy.textContent = '已复制';
+            setTimeout(() => { copy.textContent = '复制'; }, 1400);
+          } catch (error) {
+            window.prompt('复制这段：', assistantNode.textContent);
+          }
+        });
+        assistantNode.parentElement.appendChild(copy);
+      }
     }
   }
 
   form.addEventListener('submit', (event) => {
     event.preventDefault();
+    if (state.busy) {
+      if (state.controller) state.controller.abort();
+      return;
+    }
     sendMessage();
   });
 
@@ -301,7 +342,16 @@
 
   providerSelect.addEventListener('change', () => {
     state.provider = providerSelect.value;
+    state.model = modelFor(state.provider);
+    if (modelInput) modelInput.value = state.model;
   });
+
+  if (modelInput) {
+    modelInput.addEventListener('change', () => {
+      state.model = modelInput.value.trim();
+      rememberModel(state.provider, state.model);
+    });
+  }
 
   document.getElementById('ai-new').addEventListener('click', newChat);
   document.getElementById('ai-export-btn').addEventListener('click', () => {
@@ -310,6 +360,9 @@
   });
 
   document.getElementById('ai-balance-btn').addEventListener('click', loadBalance);
+
+  state.model = modelFor(state.provider);
+  if (modelInput) modelInput.value = state.model;
 
   loadChats();
   loadBalance();
