@@ -192,6 +192,55 @@ public sealed class BackupService
         return new RetentionPlan(keep, expire);
     }
 
+    /// <summary>按保留策略真正删除过期快照（需在页面上手动点确认）。</summary>
+    public async Task<(bool Ok, string Message)> ApplyRetentionAsync(CancellationToken cancellationToken)
+    {
+        if (Busy)
+        {
+            return (false, "有备份任务在跑，等它结束再清理。");
+        }
+
+        var snapshots = await ListSnapshotsAsync(cancellationToken);
+        var plan = PlanRetention(snapshots);
+
+        if (plan.Expire.Count == 0)
+        {
+            return (true, "没有需要清理的快照。");
+        }
+
+        var runId = BeginExternalRun("retention");
+        var deleted = 0;
+        var errors = new List<string>();
+
+        foreach (var snapshot in plan.Expire)
+        {
+            var result = await _kopia.RunAsync(
+                new[] { "snapshot", "delete", snapshot.Id, "--delete" },
+                cancellationToken,
+                120);
+
+            if (result.Ok)
+            {
+                deleted++;
+            }
+            else
+            {
+                var first = result.StdErr.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "未知错误";
+                errors.Add(snapshot.Id[..Math.Min(8, snapshot.Id.Length)] + "：" + first);
+            }
+        }
+
+        EndExternalRun(
+            runId,
+            errors.Count == 0,
+            errors.Count > 0 ? string.Join("；", errors.Take(3)) : null,
+            $"deleted={deleted}");
+
+        return errors.Count == 0
+            ? (true, $"已清理 {deleted} 个旧快照。")
+            : (false, $"清理 {deleted} 个，失败 {errors.Count} 个：" + errors[0]);
+    }
+
     private static bool IsFull(SnapshotInfo snapshot)
         => snapshot.Tags.Contains("kind:full", StringComparison.OrdinalIgnoreCase);
 

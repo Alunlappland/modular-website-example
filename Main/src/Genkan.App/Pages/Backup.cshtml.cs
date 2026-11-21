@@ -314,6 +314,20 @@ public class BackupModel : PageModel
         return Page();
     }
 
+    public async Task<IActionResult> OnPostRetentionAsync()
+    {
+        _ = Task.Run(async () =>
+        {
+            try { await _backup.ApplyRetentionAsync(CancellationToken.None); }
+            catch { /* 结果已写入历史 */ }
+        });
+
+        _audit.Write(HttpContext, "backup.retention", "apply", "started");
+        Message = "保留策略已在后台执行，稍后刷新看历史里的 retention 记录。";
+        await LoadAsync();
+        return Page();
+    }
+
     private async Task LoadAsync()
     {
         ExePath = _kopia.ExePath;

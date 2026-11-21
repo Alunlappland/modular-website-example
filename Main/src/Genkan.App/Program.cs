@@ -4,6 +4,7 @@ using Dapper;
 using Genkan;
 using Genkan.Backup;
 using Genkan.Blog;
+using Genkan.Console;
 using Genkan.Data;
 using Genkan.Files;
 using Genkan.Security;
@@ -378,6 +379,11 @@ app.UseWhen(
     }));
 
 app.MapGet("/api/sys", (SysMonitor monitor) => Results.Json(monitor.Sample()))
+    .RequireAuthorization();
+
+// ---------- 命令提示：只返回用法，永远不执行 ----------
+app.MapGet("/api/console/hints", (string? q, int? limit) =>
+        Results.Ok(CommandHints.Search(q, Math.Clamp(limit ?? 30, 1, 100))))
     .RequireAuthorization();
 
 // ---------- 博客：反应 / 行级注释 / 预览 ----------

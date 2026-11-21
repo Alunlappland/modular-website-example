@@ -20,6 +20,7 @@
 | 仪表盘 | `/dashboard` | 仿任务管理器：CPU/内存/磁盘/网络/进程/服务，2 秒刷新 |
 | 备份 | `/backup` | kopia：每天 12:00 快照、满 10 天打 full 恢复点、快照列表、恢复到 staging、恢复包导出 |
 | 同步 | `/sync` | Syncthing 状态/文件夹/设备；「只同步 src」的 `.stignore` 模板；一次性同步脚本 |
+| 命令提示 | `/console` | 查命令用法（ssh、端口、同步、压缩…），**只给提示、不执行**；`/api/console/hints` 可给别处调用 |
 | 路由与挂载 | `/admin/routes` | 增删挂载（static / iframe / link），**仅本机可改**，保存即生效 |
 | 关于 | `/about` | 就是本文件 |
 
@@ -87,7 +88,7 @@ Serilog · kopia · Syncthing · nssm · Cloudflare Tunnel · 纯手写 CSS/JS�
 ## 已知限制
 
 - 单文件上传上限 512MB，还没有分块续传；大文件建议走 ZeroTier/EasyTier 内网直连。
-- 备份的自动保留删除只做预览，删旧快照仍需手工确认。
+- 备份的保留策略可一键清理，但不会自动定时删（避免误删）。
 - 同步、提权、2FA、主题特效等 M6–M8 内容尚未完成（见 `Docs/PLAN-v0.3-ADDENDUM.md`）。
 
 ## 许可与致谢

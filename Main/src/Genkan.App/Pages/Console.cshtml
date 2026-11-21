@@ -1,0 +1,67 @@
+@page "/console"
+@model Genkan.Pages.ConsoleModel
+@{
+    ViewData["Title"] = "命令提示";
+}
+<link rel="stylesheet" href="/assets/css/admin.css" asp-append-version="true" />
+
+<section class="panel">
+    <h1>命令提示</h1>
+    <p class="muted">
+        这里只解释「怎么用」，<strong>不会执行任何命令</strong>。真要跑，请到服务器上的终端。
+        这个模块按设计出厂关闭执行能力。
+    </p>
+
+    <form method="get" class="console-search">
+        <label class="field">
+            <span>命令或用途</span>
+            <input name="q" value="@Model.Q" placeholder="比如 ssh、端口占用、同步、日志" autofocus />
+        </label>
+        <button class="btn" type="submit">查一下</button>
+    </form>
+
+    <div class="chips">
+        <a class="chip @(Model.Category is null ? "on" : "")" href="/console">全部</a>
+        @foreach (var category in Model.Categories)
+        {
+            <a class="chip @(Model.Category == category ? "on" : "")" href="/console?category=@Uri.EscapeDataString(category)">@category</a>
+        }
+    </div>
+
+    @if (Model.Results.Count == 0)
+    {
+        <p class="muted">没找到相关的命令。换个关键词试试，比如「压缩」「端口」「服务」。</p>
+    }
+
+    @foreach (var hint in Model.Results)
+    {
+        <article class="hint-card">
+            <header>
+                <strong>@hint.Name</strong>
+                <span class="tag">@hint.Category</span>
+            </header>
+            <p class="hint-usage"><code>@hint.Usage</code></p>
+            <p>@hint.Summary</p>
+
+            @if (hint.Examples.Length > 0)
+            {
+                <ul class="hint-examples">
+                    @foreach (var example in hint.Examples)
+                    {
+                        <li><code>@example</code></li>
+                    }
+                </ul>
+            }
+
+            @if (hint.Notes.Length > 0)
+            {
+                <ul class="hint-notes">
+                    @foreach (var note in hint.Notes)
+                    {
+                        <li>@note</li>
+                    }
+                </ul>
+            }
+        </article>
+    }
+</section>
