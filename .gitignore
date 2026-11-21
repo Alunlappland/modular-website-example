@@ -44,3 +44,6 @@ Thumbs.db
 # 部署暂存目录
 Main/bin.next/
 Main/bin.old/
+
+# rclone 运行时配置（含明文密钥）
+Main/conf/rclone.conf
