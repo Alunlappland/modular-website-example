@@ -1,0 +1,26 @@
+@page "/about"
+@model Genkan.Pages.AboutModel
+@{
+    ViewData["Title"] = "关于";
+}
+<link rel="stylesheet" href="/assets/css/blog.css" />
+
+<section class="post">
+    <a class="back" href="/">← 回玄关</a>
+
+    @if (!string.IsNullOrEmpty(Model.Error))
+    {
+        <div class="alert">@Model.Error</div>
+    }
+    else
+    {
+        <div class="post-body">
+            @foreach (var block in Model.Blocks)
+            {
+                <section class="md-block">
+                    <div class="md-content">@Html.Raw(block.Html)</div>
+                </section>
+            }
+        </div>
+    }
+</section>

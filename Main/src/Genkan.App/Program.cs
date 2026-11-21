@@ -7,6 +7,7 @@ using Genkan.Blog;
 using Genkan.Data;
 using Genkan.Files;
 using Genkan.Security;
+using Genkan.Sync;
 using Genkan.Sys;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
@@ -91,6 +92,8 @@ builder.Services.AddSingleton<SecretStore>();
 builder.Services.AddSingleton<KopiaService>();
 builder.Services.AddSingleton<BackupService>();
 builder.Services.AddHostedService<BackupScheduler>();
+builder.Services.AddSingleton<SyncService>();
+builder.Services.AddHttpClient("syncthing", client => client.Timeout = TimeSpan.FromSeconds(3));
 builder.Services.AddHttpClient("moderation", client => client.Timeout = TimeSpan.FromSeconds(8));
 builder.Services.AddSingleton<SetupState>();
 

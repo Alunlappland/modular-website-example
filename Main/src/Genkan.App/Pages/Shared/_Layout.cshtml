@@ -20,12 +20,10 @@
         ("/chat/", "对话", "✳"),
         ("/blog", "博客", "✎"),
         ("/files", "文件", "⇅"),
+        ("/about", "关于", "☾"),
     };
 
-    var soonItems = new (string Label, string Glyph)[]
-    {
-        ("关于", "☾"),
-    };
+    var soonItems = Array.Empty<(string Label, string Glyph)>();
 }
 <!doctype html>
 <html lang="zh-CN" data-theme="@theme">
@@ -83,6 +81,9 @@
                 {
                     <a class="snav-link @Active("/dashboard")" href="/dashboard">
                         <span class="glyph">▤</span><span>仪表盘</span>
+                    </a>
+                    <a class="snav-link @Active("/sync")" href="/sync">
+                        <span class="glyph">⇄</span><span>同步</span>
                     </a>
                 }
                 @if (isAdmin)

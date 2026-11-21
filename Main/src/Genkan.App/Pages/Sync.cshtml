@@ -1,0 +1,125 @@
+@page "/sync"
+@model Genkan.Pages.SyncModel
+@{
+    ViewData["Title"] = "同步";
+}
+<link rel="stylesheet" href="/assets/css/admin.css" />
+
+<section class="admin">
+    <header class="admin-head">
+        <div>
+            <p class="eyebrow">SYNC · Syncthing</p>
+            <h1>项目同步</h1>
+        </div>
+        <p class="admin-hint">
+            用 Syncthing 在机房电脑和本机之间同步项目，只同步 <code>src</code>；
+            大文件不要过隧道，优先走 ZeroTier/EasyTier 内网。
+        </p>
+    </header>
+
+    @if (!Model.Configured)
+    {
+        <div class="notice">
+            还没有配置 Syncthing。先跑一次 <code>Tools\install-syncthing.ps1</code>（管理员），
+            把打印出来的 API Key 填进 <code>Main\conf\appsettings.json</code> 的
+            <code>sync:syncthing:apiKey</code>，然后刷新本页。
+        </div>
+    }
+    else if (!Model.Reachable)
+    {
+        <div class="alert">
+            配置了 API Key，但连不上 <code>@Model.SyncthingUrl</code>。确认 Syncthing 服务在跑、端口正确。
+        </div>
+    }
+    else if (Model.Status is not null)
+    {
+        <section class="admin-form" style="margin-bottom:16px">
+            <h2>状态</h2>
+            <dl class="kv">
+                <div><dt>版本</dt><dd>@Model.Status.Version</dd></div>
+                <div><dt>设备名</dt><dd>@Model.Status.DeviceName</dd></div>
+                <div><dt>设备 ID</dt><dd><code>@Model.Status.MyId</code></dd></div>
+                <div><dt>运行时长</dt><dd>@TimeSpan.FromSeconds(Model.Status.UptimeSeconds).ToString(@"d\天\ h\小\时")</dd></div>
+            </dl>
+        </section>
+
+        <section class="admin-form" style="margin-bottom:16px">
+            <h2>文件夹（@Model.Folders.Count）</h2>
+            @if (Model.Folders.Count == 0)
+            {
+                <p class="muted">还没有文件夹。在 Syncthing 界面里添加一个项目目录即可。</p>
+            }
+            else
+            {
+                <div class="admin-table-wrap">
+                    <table class="admin-table">
+                        <thead><tr><th>ID</th><th>名称</th><th>路径</th><th>类型</th><th>状态</th></tr></thead>
+                        <tbody>
+                            @foreach (var folder in Model.Folders)
+                            {
+                                <tr>
+                                    <td><code>@folder.Id</code></td>
+                                    <td>@folder.Label</td>
+                                    <td class="snapshot-source" title="@folder.Path">@folder.Path</td>
+                                    <td>@folder.Type</td>
+                                    <td><span class="tag @(folder.Paused ? "off" : "on")">@(folder.Paused ? "暂停" : "同步中")</span></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+
+        <section class="admin-form" style="margin-bottom:16px">
+            <h2>设备（@Model.Devices.Count）</h2>
+            @if (Model.Devices.Count == 0)
+            {
+                <p class="muted">还没有配对的设备。</p>
+            }
+            else
+            {
+                <div class="admin-table-wrap">
+                    <table class="admin-table">
+                        <thead><tr><th>名称</th><th>设备 ID</th><th>状态</th></tr></thead>
+                        <tbody>
+                            @foreach (var device in Model.Devices)
+                            {
+                                <tr>
+                                    <td>@device.Name</td>
+                                    <td><code>@device.DeviceId</code></td>
+                                    <td><span class="tag @(device.Paused ? "off" : "on")">@(device.Paused ? "暂停" : "在线配置")</span></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+    }
+
+    <section class="admin-form">
+        <h2>只同步 src 的 .stignore</h2>
+        <p class="muted small">把下面内容保存成项目根目录的 <code>.stignore</code>，Syncthing 就只同步 <code>src/</code>。</p>
+        <pre class="ignore-template" id="ignore-template">@Model.IgnoreTemplate</pre>
+        <button class="btn ghost" type="button" id="copy-ignore">复制</button>
+        <p class="muted small" id="copy-ignore-status"></p>
+    </section>
+</section>
+
+<script>
+    (function () {
+        const button = document.getElementById('copy-ignore');
+        const template = document.getElementById('ignore-template');
+        const status = document.getElementById('copy-ignore-status');
+        if (!button || !template) return;
+        button.addEventListener('click', async () => {
+            try {
+                await navigator.clipboard.writeText(template.textContent);
+                if (status) status.textContent = '已复制。';
+            } catch (error) {
+                if (status) status.textContent = '复制失败，请手动选中复制。';
+            }
+        });
+    })();
+</script>
