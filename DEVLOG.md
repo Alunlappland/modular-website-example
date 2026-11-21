@@ -5,6 +5,29 @@
 
 ---
 
+## 2026-11-21 09:55 — M5：同步（Syncthing 集成 / 脚本 / 关于页）
+
+**做到哪**
+- `SyncService`：只读调用 Syncthing REST（`/rest/system/status`、`/rest/config/folders`、`/rest/config/devices`），
+  API Key 从 `sync:syncthing:apiKey` 读，超时 3 秒，不可达只记 debug 不报错。
+- `/sync`（登录可见）：状态、文件夹、设备三块；没配 Key 时直接给安装指引；
+  页面下方提供「只同步 src」的 `.stignore` 模板与一键复制。
+- `Tools\install-syncthing.ps1`：scoop 安装 + nssm 注册 `Syncthing` 服务（home 放 `Main\depend\syncthing`），
+  启动后从 config.xml 读出 API Key 打印出来。
+- `Tools\sync-src.ps1`：一次性同步 `src`，支持 `\\host\share`（robocopy，带排除项）与
+  `user@host:/path`（scp）两种目标，`-Mode push|pull`、`-DryRun`。
+- `/about`：直接渲染 `README.md` 作为站点自我陈述；首页「关于」卡片改为可点。
+- 冒烟 5 项通过；`/about` 200，`/sync`、`/backup` 未登录 302。
+
+**还没做**
+- Syncthing 本体安装需要管理员权限，脚本已备好，等你跑。
+- rclone 镜像到 R2 仍未接（缺凭据）。
+
+**下一步**
+- M6：权限点细化 + sudo 提权（TOTP）+ 音频呼叫 + 命令提示器。
+
+---
+
 ## 2026-11-21 04:50 — M4：kopia 备份
 
 **做到哪**
