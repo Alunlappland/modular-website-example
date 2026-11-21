@@ -89,14 +89,8 @@ public sealed class AiService
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
         using var reader = new StreamReader(stream);
 
-        while (!reader.EndOfStream)
+        while (await reader.ReadLineAsync(cancellationToken) is { } line)
         {
-            var line = await reader.ReadLineAsync(cancellationToken);
-            if (line is null)
-            {
-                break;
-            }
-
             if (!line.StartsWith("data:", StringComparison.Ordinal))
             {
                 continue;
@@ -163,14 +157,8 @@ public sealed class AiService
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
         using var reader = new StreamReader(stream);
 
-        while (!reader.EndOfStream)
+        while (await reader.ReadLineAsync(cancellationToken) is { } line)
         {
-            var line = await reader.ReadLineAsync(cancellationToken);
-            if (line is null)
-            {
-                break;
-            }
-
             if (!line.StartsWith("data:", StringComparison.Ordinal))
             {
                 continue;
@@ -233,10 +221,9 @@ public sealed class AiService
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
         using var reader = new StreamReader(stream);
 
-        while (!reader.EndOfStream)
+        while (await reader.ReadLineAsync(cancellationToken) is { } line)
         {
-            var line = await reader.ReadLineAsync(cancellationToken);
-            if (line is null || !line.StartsWith("data:", StringComparison.Ordinal))
+            if (!line.StartsWith("data:", StringComparison.Ordinal))
             {
                 continue;
             }
