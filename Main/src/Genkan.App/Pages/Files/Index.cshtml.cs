@@ -27,6 +27,30 @@ public class IndexModel : PageModel
 
     public IReadOnlyList<FileRow> Files { get; private set; } = Array.Empty<FileRow>();
 
+    /// <summary>顶层文件夹分组：name 是第一个路径段。</summary>
+    public sealed class FileGroup
+    {
+        public string Name { get; init; } = string.Empty;
+
+        public List<FileRow> Files { get; } = new();
+    }
+
+    public IReadOnlyList<FileGroup> Groups { get; private set; } = Array.Empty<FileGroup>();
+
+    public IReadOnlyList<FileRow> LooseFiles { get; private set; } = Array.Empty<FileRow>();
+
+    public static string SizeText(long bytes)
+        => bytes >= 1024L * 1024 * 1024
+            ? (bytes / 1024.0 / 1024 / 1024).ToString("F2") + " GB"
+            : (bytes / 1024.0 / 1024).ToString("F2") + " MB";
+
+    public string SizeOf(long bytes) => SizeText(bytes);
+
+    public string TimeOf(string? iso) => TimeText(iso);
+
+    public static string TimeText(string? iso)
+        => DateTimeOffset.TryParse(iso, out var at) ? at.ToLocalTime().ToString("MM-dd HH:mm") : (iso ?? string.Empty);
+
     public IReadOnlyList<ShareRow> Shares { get; private set; } = Array.Empty<ShareRow>();
 
     [BindProperty]
@@ -133,6 +157,36 @@ public class IndexModel : PageModel
         return wantsJson
             ? new JsonResult(new { ok = failed.Count == 0, message = Message, saved, failed = failed.Take(5).ToArray() })
             : Page();
+    }
+
+    private void BuildGroups()
+    {
+        var groups = new Dictionary<string, FileGroup>(StringComparer.OrdinalIgnoreCase);
+        var loose = new List<FileRow>();
+
+        foreach (var file in Files)
+        {
+            var slash = file.Name.IndexOf('/');
+            if (slash <= 0)
+            {
+                loose.Add(file);
+                continue;
+            }
+
+            var key = file.Name[..slash];
+            if (!groups.TryGetValue(key, out var group))
+            {
+                group = new FileGroup { Name = key };
+                groups[key] = group;
+            }
+
+            group.Files.Add(file);
+        }
+
+        Groups = groups.Values
+            .OrderByDescending(group => group.Files.Max(file => file.CreatedAt))
+            .ToList();
+        LooseFiles = loose;
     }
 
     public bool IsMissing(FileRow file) => !_storage.Exists(file);
@@ -341,5 +395,6 @@ public class IndexModel : PageModel
     {
         Files = _repository.ListFiles(OwnerId);
         Shares = _repository.ListShares(OwnerId);
+        BuildGroups();
     }
 }

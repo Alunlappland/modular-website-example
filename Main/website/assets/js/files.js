@@ -1,4 +1,4 @@
-/* 文件页：拖拽、分块上传、复制链接 */
+/* 文件页：拖拽、分块上传、失败重试、复制链接 */
 (function () {
   'use strict';
 
@@ -10,6 +10,7 @@
   const progress = document.getElementById('upload-progress');
   const bar = document.getElementById('upload-bar');
   const status = document.getElementById('upload-status');
+  const retry = document.getElementById('upload-retry');
 
   // ---- 拖拽 ----
   if (dropzone && input) {
@@ -35,7 +36,7 @@
     });
   }
 
-  // ---- 上传：小文件整传，大文件分块（2MB/块，避开 Cloudflare 的 100 秒与 100MB 限制）----
+  // ---- 上传 ----
   if (form && input) {
     const CHUNK_SIZE = 2 * 1024 * 1024;
     const DIRECT_LIMIT = 4 * 1024 * 1024;
@@ -68,13 +69,136 @@
 
       xhr.addEventListener('load', () => {
         let json = null;
-        try { json = JSON.parse(xhr.responseText); } catch (error) { /* 非 JSON 响应 */ }
+        try { json = JSON.parse(xhr.responseText); } catch (error) { /* 非 JSON */ }
         resolve({ status: xhr.status, json });
       });
 
       xhr.addEventListener('error', () => resolve({ status: 0, json: null }));
       xhr.send(data);
     });
+
+    const tokenInput = () => form.querySelector('input[name="__RequestVerificationToken"]');
+
+    const uploadDirect = async (file, token, onProgress) => {
+      const data = new FormData();
+      data.append('Uploads', file, file.webkitRelativePath || file.name);
+      if (token) data.append('__RequestVerificationToken', token);
+
+      const result = await postForm(handlerUrl('Upload'), data, onProgress);
+      if (result.status !== 200 || !result.json || !result.json.ok) {
+        throw new Error('HTTP ' + result.status);
+      }
+    };
+
+    const uploadChunked = async (file, token, onProgress) => {
+      const id = randomId();
+      const relative = file.webkitRelativePath || file.name;
+      let offset = 0;
+
+      while (offset < file.size) {
+        const end = Math.min(offset + CHUNK_SIZE, file.size);
+        const blob = file.slice(offset, end);
+        let advanced = false;
+
+        for (let attempt = 0; attempt < 3 && !advanced; attempt++) {
+          const data = new FormData();
+          data.append('Chunk', blob, 'chunk');
+          data.append('uploadId', id);
+          data.append('offset', String(offset));
+          if (token) data.append('__RequestVerificationToken', token);
+
+          const result = await postForm(handlerUrl('Chunk'), data, (loaded) => onProgress(offset + loaded));
+
+          if (result.status === 200 && result.json && result.json.ok) {
+            offset = end;
+            advanced = true;
+          } else if (result.status === 409 && result.json && typeof result.json.expected === 'number') {
+            offset = result.json.expected;
+            advanced = true;
+          } else {
+            await sleep(700 * (attempt + 1));
+          }
+        }
+
+        if (!advanced) throw new Error('分块中断');
+        onProgress(offset);
+      }
+
+      const done = new FormData();
+      done.append('uploadId', id);
+      done.append('fileName', relative);
+      done.append('totalBytes', String(file.size));
+      if (token) done.append('__RequestVerificationToken', token);
+
+      const result = await postForm(handlerUrl('Complete'), done);
+      if (result.status !== 200 || !result.json || !result.json.ok) {
+        throw new Error('合并失败 HTTP ' + result.status);
+      }
+    };
+
+    const setBusy = (busy, text) => {
+      if (button) {
+        button.disabled = busy;
+        button.textContent = busy ? '上传中…' : '上传';
+      }
+      if (retry) retry.hidden = true;
+      if (busy && progress) progress.hidden = false;
+      if (text && status) status.textContent = text;
+    };
+
+    const runBatch = async (files, label) => {
+      if (!files.length) return;
+
+      const token = tokenInput() ? tokenInput().value : '';
+      const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
+      let doneBytes = 0;
+      const failed = [];
+
+      setBusy(true, '准备上传…');
+
+      const paint = (index, currentLoaded) => {
+        const overall = totalBytes === 0 ? 0 : Math.round(((doneBytes + currentLoaded) / totalBytes) * 100);
+        if (bar) bar.style.width = overall + '%';
+        if (status) {
+          status.textContent = label + '　第 ' + (index + 1) + ' / ' + files.length + ' 个（' + overall + '%）　' +
+            files[index].name;
+        }
+      };
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        try {
+          if (file.size >= DIRECT_LIMIT) {
+            await uploadChunked(file, token, (loaded) => paint(i, loaded));
+          } else {
+            await uploadDirect(file, token, (loaded) => paint(i, loaded));
+          }
+        } catch (error) {
+          failed.push(file);
+        }
+        doneBytes += file.size;
+        paint(i, 0);
+      }
+
+      const okCount = files.length - failed.length;
+
+      if (failed.length === 0) {
+        if (status) status.textContent = label + '：成功 ' + okCount + ' 个，正在刷新…';
+        setTimeout(() => window.location.reload(), 700);
+        return;
+      }
+
+      if (status) {
+        status.textContent = label + '：成功 ' + okCount + ' 个，失败 ' + failed.length + ' 个';
+      }
+
+      setBusy(false);
+      if (retry) {
+        retry.hidden = false;
+        retry.textContent = '重试失败文件（' + failed.length + '）';
+        retry.onclick = () => runBatch(failed.slice(), '重试');
+      }
+    };
 
     form.addEventListener('submit', (event) => {
       event.preventDefault();
@@ -88,110 +212,13 @@
         return;
       }
 
-      const tokenInput = form.querySelector('input[name="__RequestVerificationToken"]');
-      const token = tokenInput ? tokenInput.value : '';
-      const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
-      let doneBytes = 0;
-      let failed = 0;
-
-      if (progress) progress.hidden = false;
-      if (button) {
-        button.disabled = true;
-        button.textContent = '上传中…';
+      let label = files.length + ' 个文件';
+      const first = files[0].webkitRelativePath || '';
+      if (first.indexOf('/') > 0) {
+        label = '「' + first.split('/')[0] + '」文件夹（' + files.length + ' 个文件）';
       }
 
-      const paint = (fileIndex, currentLoaded) => {
-        const overall = totalBytes === 0 ? 0 : Math.round(((doneBytes + currentLoaded) / totalBytes) * 100);
-        if (bar) bar.style.width = overall + '%';
-        if (status) {
-          status.textContent = '第 ' + (fileIndex + 1) + ' / ' + files.length + ' 个（' + overall + '%）　' +
-            files[fileIndex].name;
-        }
-      };
-
-      const uploadDirect = async (file, index) => {
-        const data = new FormData();
-        data.append('Uploads', file, file.webkitRelativePath || file.name);
-        if (token) data.append('__RequestVerificationToken', token);
-
-        const result = await postForm(handlerUrl('Upload'), data, (loaded) => paint(index, loaded));
-        if (result.status !== 200 || !result.json || !result.json.ok) {
-          throw new Error('HTTP ' + result.status);
-        }
-      };
-
-      const uploadChunked = async (file, index) => {
-        const id = randomId();
-        const relative = file.webkitRelativePath || file.name;
-        let offset = 0;
-
-        while (offset < file.size) {
-          const end = Math.min(offset + CHUNK_SIZE, file.size);
-          const blob = file.slice(offset, end);
-          let advanced = false;
-
-          for (let attempt = 0; attempt < 3 && !advanced; attempt++) {
-            const data = new FormData();
-            data.append('Chunk', blob, 'chunk');
-            data.append('uploadId', id);
-            data.append('offset', String(offset));
-            if (token) data.append('__RequestVerificationToken', token);
-
-            const result = await postForm(handlerUrl('Chunk'), data, (loaded) => paint(index, offset + loaded));
-
-            if (result.status === 200 && result.json && result.json.ok) {
-              offset = end;
-              advanced = true;
-            } else if (result.status === 409 && result.json && typeof result.json.expected === 'number') {
-              // 上次中断过：服务端已有字节数不同，对齐后重发
-              offset = result.json.expected;
-              advanced = true;
-            } else {
-              await sleep(700 * (attempt + 1));
-            }
-          }
-
-          if (!advanced) throw new Error('分块上传中断');
-          paint(index, offset);
-        }
-
-        const done = new FormData();
-        done.append('uploadId', id);
-        done.append('fileName', relative);
-        done.append('totalBytes', String(file.size));
-        if (token) done.append('__RequestVerificationToken', token);
-
-        const result = await postForm(handlerUrl('Complete'), done);
-        if (result.status !== 200 || !result.json || !result.json.ok) {
-          throw new Error('合并失败（HTTP ' + result.status + '）');
-        }
-      };
-
-      (async () => {
-        for (let i = 0; i < files.length; i++) {
-          const file = files[i];
-          try {
-            if (file.size >= DIRECT_LIMIT) {
-              await uploadChunked(file, i);
-            } else {
-              await uploadDirect(file, i);
-            }
-          } catch (error) {
-            failed++;
-            if (status) status.textContent = '「' + file.name + '」失败：' + error.message + '，继续…';
-          }
-          doneBytes += file.size;
-          paint(i, 0);
-        }
-
-        if (status) {
-          status.textContent = failed === 0
-            ? '全部完成（' + files.length + ' 个），正在刷新…'
-            : '完成，' + failed + ' 个失败，正在刷新…';
-        }
-
-        setTimeout(() => window.location.reload(), 800);
-      })();
+      runBatch(files, label);
     });
   }
 

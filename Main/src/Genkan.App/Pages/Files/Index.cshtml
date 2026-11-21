@@ -51,6 +51,7 @@
             <div class="upload-progress" id="upload-progress" hidden>
                 <div class="bar"><i id="upload-bar" style="width:0%"></i></div>
                 <p class="win-sub" id="upload-status"></p>
+                <button class="btn ghost" type="button" id="upload-retry" hidden>重试</button>
             </div>
         </form>
     </section>
@@ -71,45 +72,98 @@
         }
         else
         {
-            <table class="file-table">
-                <thead>
-                    <tr><th>名称</th><th>大小</th><th>时间</th><th>操作</th></tr>
-                </thead>
-                <tbody>
-                    @foreach (var file in Model.Files)
-                    {
-                        <tr>
-                            <td class="name" title="@file.Name">
-                                @file.Name
-                                @if (Model.IsMissing(file))
-                                {
-                                    <span class="tag off">缺失</span>
-                                }
-                            </td>
-                            <td>@((file.Size / 1024.0 / 1024).ToString("F2")) MB</td>
-                            <td>@(DateTimeOffset.TryParse(file.CreatedAt, out var at) ? at.ToLocalTime().ToString("MM-dd HH:mm") : file.CreatedAt)</td>
-                            <td class="ops">
-                                @if (Model.IsMissing(file))
-                                {
-                                    <span class="muted small">文件已丢失</span>
-                                }
-                                else
-                                {
-                                    <a class="link" href="/files?handler=Download&id=@file.Id">下载</a>
-                                }
-                                <form method="post" asp-page-handler="Share">
-                                    <input type="hidden" name="id" value="@file.Id" />
-                                    <button class="link" type="submit">分享</button>
-                                </form>
-                                <form method="post" asp-page-handler="Delete" onsubmit="return confirm('删除这个文件？');">
-                                    <input type="hidden" name="id" value="@file.Id" />
-                                    <button class="link danger" type="submit">删除</button>
-                                </form>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+            @if (Model.LooseFiles.Count > 0)
+            {
+                <table class="file-table">
+                    <thead>
+                        <tr><th>名称</th><th>大小</th><th>时间</th><th>操作</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var file in Model.LooseFiles)
+                        {
+                            <tr>
+                                <td class="name" title="@file.Name">
+                                    @file.Name
+                                    @if (Model.IsMissing(file))
+                                    {
+                                        <span class="tag off">缺失</span>
+                                    }
+                                </td>
+                                <td>@Model.SizeOf(file.Size)</td>
+                                <td>@Model.TimeOf(file.CreatedAt)</td>
+                                <td class="ops">
+                                    @if (Model.IsMissing(file))
+                                    {
+                                        <span class="muted small">文件已丢失</span>
+                                    }
+                                    else
+                                    {
+                                        <a class="link" href="/files?handler=Download&id=@file.Id">下载</a>
+                                    }
+                                    <form method="post" asp-page-handler="Share">
+                                        <input type="hidden" name="id" value="@file.Id" />
+                                        <button class="link" type="submit">分享</button>
+                                    </form>
+                                    <form method="post" asp-page-handler="Delete" onsubmit="return confirm('删除这个文件？');">
+                                        <input type="hidden" name="id" value="@file.Id" />
+                                        <button class="link danger" type="submit">删除</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+
+            @foreach (var group in Model.Groups)
+            {
+                <details class="file-group">
+                    <summary>
+                        <span class="group-name">📁 @group.Name</span>
+                        <span class="win-sub">
+                            @group.Files.Count 个文件 · @Model.SizeOf(group.Files.Sum(file => file.Size)) ·
+                            @Model.TimeOf(group.Files.Max(file => file.CreatedAt))
+                        </span>
+                    </summary>
+                    <table class="file-table">
+                        <tbody>
+                            @foreach (var file in group.Files)
+                            {
+                                var leaf = file.Name[(group.Name.Length + 1)..];
+                                <tr>
+                                    <td class="name" title="@file.Name">
+                                        @leaf
+                                        @if (Model.IsMissing(file))
+                                        {
+                                            <span class="tag off">缺失</span>
+                                        }
+                                    </td>
+                                    <td>@Model.SizeOf(file.Size)</td>
+                                    <td>@Model.TimeOf(file.CreatedAt)</td>
+                                    <td class="ops">
+                                        @if (Model.IsMissing(file))
+                                        {
+                                            <span class="muted small">文件已丢失</span>
+                                        }
+                                        else
+                                        {
+                                            <a class="link" href="/files?handler=Download&id=@file.Id">下载</a>
+                                        }
+                                        <form method="post" asp-page-handler="Share">
+                                            <input type="hidden" name="id" value="@file.Id" />
+                                            <button class="link" type="submit">分享</button>
+                                        </form>
+                                        <form method="post" asp-page-handler="Delete" onsubmit="return confirm('删除这个文件？');">
+                                            <input type="hidden" name="id" value="@file.Id" />
+                                            <button class="link danger" type="submit">删除</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </details>
+            }
         }
     </section>
 

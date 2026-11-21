@@ -101,3 +101,17 @@
 .upload-progress { margin-top: 12px; }
 .upload-progress .bar { height: 8px; border-radius: 999px; background: color-mix(in srgb, var(--ink) 9%, transparent); overflow: hidden; }
 .upload-progress .bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #fff)); transition: width 0.2s ease; }
+
+/* 文件夹分组（可折叠） */
+.file-group { border-top: 1px solid var(--line); padding: 4px 0; }
+.file-group summary {
+  display: flex; align-items: baseline; gap: 12px; cursor: pointer;
+  list-style: none; padding: 10px 2px; border-radius: 8px;
+}
+.file-group summary::-webkit-details-marker { display: none; }
+.file-group summary:hover { background: color-mix(in srgb, var(--ink) 3%, transparent); }
+.file-group summary::before { content: "?"; color: var(--ink-soft); font-size: 12px; }
+.file-group[open] summary::before { content: "?"; }
+.file-group .group-name { font-weight: 600; }
+.file-group[open] table { margin: 4px 0 10px; }
+#upload-retry { margin-top: 8px; }
