@@ -39,8 +39,18 @@ public sealed class SyncService
             return null;
         }
 
+        var version = json.Value.TryGetProperty("version", out var versionValue) ? versionValue.GetString() ?? "" : "";
+        if (string.IsNullOrWhiteSpace(version))
+        {
+            var versionJson = await GetJsonAsync("/rest/system/version", cancellationToken);
+            if (versionJson is not null && versionJson.Value.TryGetProperty("version", out var v2))
+            {
+                version = v2.GetString() ?? "";
+            }
+        }
+
         return new SyncthingStatus(
-            json.Value.TryGetProperty("version", out var version) ? version.GetString() ?? "" : "",
+            version,
             json.Value.TryGetProperty("deviceName", out var name) ? name.GetString() ?? "" : "",
             json.Value.TryGetProperty("myID", out var id) ? id.GetString() ?? "" : "",
             json.Value.TryGetProperty("uptime", out var uptime) && uptime.TryGetInt64(out var seconds) ? seconds : 0);
