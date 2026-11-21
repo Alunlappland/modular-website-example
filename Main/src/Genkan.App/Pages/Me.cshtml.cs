@@ -70,6 +70,9 @@ public class MeModel : PageModel
     public string FontChoice { get; set; } = "serif";
 
     [BindProperty]
+    public bool InsetBackground { get; set; } = true;
+
+    [BindProperty]
     public IFormFile? Background { get; set; }
 
     public void OnGet()
@@ -77,6 +80,7 @@ public class MeModel : PageModel
         Load();
         EffectsEnabled = ThemeSettings.Effects;
         FontChoice = ThemeSettings.Font;
+        InsetBackground = ThemeSettings.InsetBackground;
     }
 
     public IActionResult OnPostChangePassword()
@@ -197,6 +201,7 @@ public class MeModel : PageModel
         {
             Effects = EffectsEnabled,
             Font = string.IsNullOrWhiteSpace(FontChoice) ? "serif" : FontChoice,
+            InsetBackground = InsetBackground,
         });
 
         Message = "外观偏好已保存。";

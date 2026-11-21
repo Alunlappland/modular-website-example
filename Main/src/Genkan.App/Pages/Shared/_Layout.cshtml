@@ -32,7 +32,7 @@
     var bgStyle = hasBackground ? $"--bg-image:url('/theme/background?v={ThemeService.BackgroundVersion}')" : string.Empty;
 }
 <!doctype html>
-<html lang="zh-CN" data-theme="@theme" data-fx="@(effects ? "on" : "off")" data-font="@themeSettings.Font">
+<html lang="zh-CN" data-theme="@theme" data-fx="@(effects ? "on" : "off")" data-font="@themeSettings.Font" data-bg="@(themeSettings.InsetBackground ? "inset" : "full")">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />

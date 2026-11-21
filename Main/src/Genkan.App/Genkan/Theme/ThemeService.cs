@@ -6,6 +6,9 @@ public sealed class ThemeSettings
 {
     public bool Effects { get; set; } = true;
     public string Font { get; set; } = "serif";
+
+    /// <summary>背景图左右留白，而不是铺满整屏。</summary>
+    public bool InsetBackground { get; set; } = true;
 }
 
 /// <summary>「里」主题的外观偏好：特效开关、字体、背景图（背景图只存服务器，不进 git）。</summary>

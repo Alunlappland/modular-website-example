@@ -473,3 +473,24 @@ html[data-font="sans"] body.app { font-family: "Segoe UI", system-ui, -apple-sys
   background: var(--card-solid); color: var(--ink); font: inherit; font-size: 13.5px;
 }
 .secret { word-break: break-all; font-size: 13px; }
+
+/* ±³¾°×óÓÒÁô°×£¨Ä¬ÈÏ£©£¬¿ÉÓÃ /me ÇĞ»ØÆÌÂú */
+html[data-bg="inset"] body.has-bg::before {
+  inset: 0 clamp(28px, 7vw, 150px);
+  border-radius: 22px;
+  background-size: cover;
+  opacity: 0.5;
+  box-shadow: 0 30px 80px -60px rgba(0, 0, 0, 0.45);
+}
+
+html[data-bg="full"] body.has-bg::before {
+  inset: 0;
+  border-radius: 0;
+}
+
+@media (max-width: 720px) {
+  html[data-bg="inset"] body.has-bg::before {
+    inset: 0 clamp(10px, 4vw, 24px);
+    border-radius: 14px;
+  }
+}
