@@ -28,7 +28,7 @@ public class NotesModel : PageModel
     public string? Name { get; set; }
 
     [BindProperty]
-    public string? Content { get; set; }
+    public string? Body { get; set; }
 
     [BindProperty]
     public IFormFile? Upload { get; set; }
@@ -44,7 +44,7 @@ public class NotesModel : PageModel
         if (!string.IsNullOrWhiteSpace(edit))
         {
             Name = edit;
-            Content = _notes.Read(edit);
+            Body = _notes.Read(edit);
             return;
         }
 
@@ -73,7 +73,7 @@ public class NotesModel : PageModel
             return Page();
         }
 
-        _notes.Save(name, Content ?? string.Empty);
+        _notes.Save(name, Body ?? string.Empty);
         Message = "已保存：" + name + ".md";
         return RedirectToPage(new { file = name });
     }
