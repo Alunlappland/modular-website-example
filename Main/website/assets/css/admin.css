@@ -155,3 +155,19 @@ select {
 .hint-examples, .hint-notes { margin: 8px 0 0; padding-left: 20px; font-size: 13px; }
 .hint-examples li, .hint-notes li { margin: 3px 0; color: var(--ink-soft); }
 .hint-examples code { font-size: 12.5px; }
+
+/* π“‘ÿ–°Ã˘ ø */
+.tip-code {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card-solid);
+  padding: 12px 14px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.7;
+  overflow-x: auto;
+  white-space: pre;
+}
+.tip-list { margin: 8px 0 0; padding-left: 20px; font-size: 13.5px; }
+.tip-list li { margin: 4px 0; color: var(--ink-soft); }
+.tip-list b { color: var(--ink); }

@@ -94,7 +94,7 @@
                     <input asp-for="TargetUrl" placeholder="http://127.0.0.1:5244" />
                 </label>
                 <label class="field">
-                    <span>权限点（留空 = 登录即可）</span>
+                    <span>权限点（留空 = 公开；填 auth = 登录可见）</span>
                     <input asp-for="Permission" placeholder="chat.use" />
                 </label>
                 <label class="field">
@@ -109,4 +109,107 @@
             <button class="btn" type="submit">保存挂载</button>
         </form>
     </section>
+</section>
+</section>
+
+<section class="admin" style="margin-top:18px">
+    <h2>小贴士：怎么挂一个东西</h2>
+    <p class="muted small">
+        挂载物就是 <code>Extend\</code> 下的一个文件夹。磁盘是唯一事实来源，页面上的保存只是替你写 <code>extend.json</code>；
+        你也可以直接用编辑器改文件，然后点上面的「重新扫描」。
+    </p>
+
+    <h3>1. 目录结构</h3>
+    <pre class="tip-code">website\
+└─ Extend\
+   ├─ chat\                 ← 一个挂载物 = 一个文件夹
+   │  ├─ extend.json        ← 清单（必需）
+   │  └─ index.html         ← 入口文件
+   └─ notes\
+      ├─ extend.json
+      └─ index.html</pre>
+
+    <h3>2. extend.json 能写什么</h3>
+    <table class="admin-table">
+        <thead>
+            <tr><th>字段</th><th>默认</th><th>说明</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><code>id</code></td><td>文件夹名</td><td>唯一标识，别和别的挂载重名</td></tr>
+            <tr><td><code>title</code></td><td>等于 id</td><td>玄关里的显示名</td></tr>
+            <tr><td><code>route</code></td><td><code>/&lt;id&gt;</code></td><td>访问路径，必须以 / 开头</td></tr>
+            <tr><td><code>kind</code></td><td><code>static</code></td><td><code>static</code> / <code>iframe</code> / <code>link</code></td></tr>
+            <tr><td><code>entry</code></td><td><code>index.html</code></td><td>static 的入口文件</td></tr>
+            <tr><td><code>url</code></td><td>空</td><td>iframe / link 的目标地址</td></tr>
+            <tr><td><code>permission</code></td><td>空</td><td>空 = 公开；<code>auth</code> = 登录可见；也可填 <code>chat.use</code> 等权限点</td></tr>
+            <tr><td><code>enabled</code></td><td><code>true</code></td><td>false 时整条挂载不生效</td></tr>
+            <tr><td><code>order</code></td><td><code>100</code></td><td>玄关里排序，小的在前</td></tr>
+        </tbody>
+    </table>
+
+    <h3>3. 三种类型分别怎么用</h3>
+
+    <p><b>static</b>：把文件夹当网站根目录直接提供，最常用。</p>
+    <pre class="tip-code">{
+  "id": "notes",
+  "title": "笔记",
+  "route": "/notes-ui",
+  "kind": "static",
+  "entry": "index.html",
+  "order": 120
+}</pre>
+    <p class="muted small">
+        访问 <code>/notes-ui</code> 会返回 <code>Extend\notes\index.html</code>，
+        页面里的 <code>/notes-ui/app.js</code> 对应 <code>Extend\notes\app.js</code>。
+        用相对路径（<code>./app.js</code>）最稳。
+    </p>
+
+    <p><b>iframe</b>：把别的服务嵌进来（比如跑在 5244 端口的网盘）。</p>
+    <pre class="tip-code">{
+  "id": "alist",
+  "title": "网盘",
+  "route": "/drive",
+  "kind": "iframe",
+  "url": "http://127.0.0.1:5244",
+  "permission": "auth",
+  "order": 200
+}</pre>
+
+    <p><b>link</b>：只做 302 跳转，适合跳到外部站点。</p>
+    <pre class="tip-code">{
+  "id": "github",
+  "title": "GitHub",
+  "route": "/gh",
+  "kind": "link",
+  "url": "https://github.com/Alunlappland"
+}</pre>
+
+    <h3>4. 权限怎么写</h3>
+    <ul class="tip-list">
+        <li><b>留空</b>：任何人都能访问（公开）。想放个公开小页面就用这个。</li>
+        <li><b>auth</b>：登录后才能看，不要求具体权限点。</li>
+        <li><b>chat.use / blog.read / files.read / files.write / sync.use / backup.view</b>：按角色判定，admin 永远通过。</li>
+    </ul>
+
+    <h3>5. 生效与排查</h3>
+    <ul class="tip-list">
+        <li>页面上保存 → 立刻重新扫描，不用重启服务。</li>
+        <li>手动改了 <code>extend.json</code> → 回来点「重新扫描」。</li>
+        <li><b>404</b>：检查 <code>entry</code> 文件名、<code>route</code> 是否写错，以及文件夹里到底有没有那个文件。</li>
+        <li><b>白屏</b>：多半是静态资源用了绝对路径 <code>/app.js</code>，改成 <code>./app.js</code> 或 <code>/你的route/app.js</code>。</li>
+        <li><b>iframe 一片空白</b>：目标站点用 <code>X-Frame-Options</code> 或 CSP 禁止被嵌入，这种情况只能用 link 跳转。</li>
+        <li><b>被拒绝</b>：路由撞了系统保留路径，或者权限点不对。</li>
+    </ul>
+
+    <h3>6. 这些路由被系统占了，别用</h3>
+    <p class="muted small">
+        <code>/</code> <code>/login</code> <code>/logout</code> <code>/setup</code> <code>/me</code>
+        <code>/dashboard</code> <code>/admin</code> <code>/api</code> <code>/assets</code>
+        <code>/healthz</code> <code>/theme</code> <code>/favicon</code> <code>/chat</code>
+    </p>
+
+    <p class="muted small">
+        最后一句：static 挂载会把这个文件夹里的所有文件都公开出去（除非你设了 permission），
+        别把密钥、数据库、私人照片放在里面。
+    </p>
 </section>

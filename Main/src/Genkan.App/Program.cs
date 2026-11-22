@@ -310,7 +310,9 @@ app.Use(async (context, next) =>
             return;
         }
 
-        if (!Permissions.Has(context.User, mount.Permission!))
+        // permission 填 auth 表示「登录即可」，不要求具体权限点
+        if (!string.Equals(mount.Permission, "auth", StringComparison.OrdinalIgnoreCase) &&
+            !Permissions.Has(context.User, mount.Permission!))
         {
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
             context.Response.ContentType = "text/plain; charset=utf-8";
