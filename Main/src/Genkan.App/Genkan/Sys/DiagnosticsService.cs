@@ -179,7 +179,21 @@ public sealed class DiagnosticsService
             var logPath = Path.Combine(_paths.Logs, $"app-{DateTime.Now:yyyyMMdd}.log");
             if (File.Exists(logPath))
             {
-                var errors = File.ReadLines(logPath).Count(line => line.Contains("[ERR]", StringComparison.Ordinal));
+                var errors = 0;
+
+                // Serilog 正开着这个文件，必须用共享读写方式打开，否则会被锁挡住
+                using (var stream = new FileStream(logPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                using (var reader = new StreamReader(stream))
+                {
+                    while (reader.ReadLine() is { } line)
+                    {
+                        if (line.Contains("[ERR]", StringComparison.Ordinal))
+                        {
+                            errors++;
+                        }
+                    }
+                }
+
                 checks.Add(new DiagnosticCheck("日志", errors > 20 ? "warn" : "ok", $"今天 {errors} 条 ERR"));
             }
             else
@@ -189,7 +203,8 @@ public sealed class DiagnosticsService
         }
         catch (Exception ex)
         {
-            checks.Add(new DiagnosticCheck("日志", "fail", ex.Message));
+            // 日志读不到不影响站点本身，标注一下就好
+            checks.Add(new DiagnosticCheck("日志", "warn", "读日志时出错：" + ex.Message));
         }
 
         return checks;
