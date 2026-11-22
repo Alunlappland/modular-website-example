@@ -13,11 +13,12 @@
   const caption = document.getElementById('gallery-caption');
 
   const tags = page.dataset.tags || '';
+  const source = page.dataset.source || '';
   let currentPage = 1;
   let loading = false;
   let exhausted = false;
 
-  const proxy = (url) => '/api/gallery/image?url=' + encodeURIComponent(url);
+  const proxy = (url) => (url && url.startsWith('/')) ? url : '/api/gallery/image?url=' + encodeURIComponent(url);
 
   function card(item) {
     const box = document.createElement('figure');
@@ -54,7 +55,7 @@
     if (status) status.textContent = '加载中…（第 ' + currentPage + ' 页）';
 
     try {
-      const response = await fetch('/api/gallery?page=' + currentPage + '&tags=' + encodeURIComponent(tags), {
+      const response = await fetch('/api/gallery?page=' + currentPage + '&tags=' + encodeURIComponent(tags) + '&source=' + encodeURIComponent(source), {
         headers: { Accept: 'application/json' },
       });
 

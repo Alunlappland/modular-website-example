@@ -41,19 +41,24 @@ public sealed class GalleryService
 
     public int PageSize => Math.Clamp(_config.GetValue("gallery:limit", 24), 4, 48);
 
-    public async Task<IReadOnlyList<GalleryImage>> FetchAsync(int page, string? tags, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<GalleryImage>> FetchAsync(int page, string? tags, CancellationToken cancellationToken, string? providerOverride = null)
     {
         page = Math.Clamp(page, 1, 200);
         var tagQuery = string.IsNullOrWhiteSpace(tags) ? DefaultTags : tags.Trim();
+        var provider = string.IsNullOrWhiteSpace(providerOverride) ? Provider : providerOverride.Trim().ToLowerInvariant();
+        if (provider is not ("safebooru" or "konachan"))
+        {
+            provider = Provider;
+        }
 
-        var cacheKey = Provider + "|" + tagQuery + "|" + page;
+        var cacheKey = provider + "|" + tagQuery + "|" + page;
         if (_cache.TryGetValue(cacheKey, out var cached) &&
             DateTimeOffset.UtcNow - cached.At < TimeSpan.FromMinutes(5))
         {
             return cached.Items;
         }
 
-        var items = Provider == "safebooru"
+        var items = provider == "safebooru"
             ? await FetchSafebooruAsync(page, tagQuery, cancellationToken)
             : await FetchKonachanAsync(page, tagQuery, cancellationToken);
 
@@ -61,7 +66,7 @@ public sealed class GalleryService
         if (items.Count == 0)
         {
             _logger.LogInformation("主图源没有结果，尝试备用源");
-            items = Provider == "safebooru"
+            items = provider == "safebooru"
                 ? await FetchKonachanAsync(page, tagQuery, cancellationToken)
                 : await FetchSafebooruAsync(page, tagQuery, cancellationToken);
         }

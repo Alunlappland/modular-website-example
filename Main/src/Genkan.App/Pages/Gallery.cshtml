@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="/assets/css/gallery.css" asp-append-version="true" />
 
 <section class="gallery-page" id="gallery"
-         data-tags="@Model.Tags" data-provider="@Model.Provider">
+         data-tags="@Model.Tags" data-provider="@Model.Provider" data-source="@Model.Source">
     <header class="gallery-head">
         <div>
             <p class="eyebrow">GALLERY</p>
@@ -14,10 +14,20 @@
             <p class="muted small">只从 SFW 图源拉取（@Model.ProviderLabel · @Model.Tags）。往下滚会自动加载。</p>
         </div>
         <form method="get" class="gallery-search">
+            <input type="hidden" name="source" value="@Model.Source" />
             <input name="tags" value="@Model.Tags" placeholder="标签，比如 landscape / 风景" autocomplete="off" />
             <button class="btn" type="submit">换一批</button>
         </form>
     </header>
+
+    <div class="gallery-sources">
+        @foreach (var source in Model.Sources)
+        {
+            <a class="chip @(Model.Source == source.Id ? "on" : "")"
+               href="/gallery?source=@source.Id&tags=@Uri.EscapeDataString(Model.Tags)">@source.Label</a>
+        }
+        <span class="muted small">换源不影响已加载的图，点一下重新开始</span>
+    </div>
 
     <div class="gallery-flow" id="gallery-flow"></div>
 

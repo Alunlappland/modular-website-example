@@ -17,9 +17,24 @@ public class GalleryModel : PageModel
 
     public string ProviderLabel => Provider == "safebooru" ? "safebooru" : "konachan.net";
 
-    public void OnGet(string? tags)
+    public string Source { get; private set; } = "safebooru";
+
+    public IReadOnlyList<(string Id, string Label)> Sources { get; } = new[]
+    {
+        ("safebooru", "safebooru"),
+        ("konachan", "konachan.net"),
+        ("local", "本地（我上传的）"),
+    };
+
+    public void OnGet(string? tags, string? source)
     {
         Provider = _gallery.Provider;
+        Source = string.IsNullOrWhiteSpace(source) ? Provider : source.Trim().ToLowerInvariant();
+        if (Source is not ("safebooru" or "konachan" or "local"))
+        {
+            Source = Provider;
+        }
+
         Tags = string.IsNullOrWhiteSpace(tags) ? _gallery.DefaultTags : tags.Trim();
     }
 }

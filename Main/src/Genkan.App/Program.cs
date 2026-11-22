@@ -475,9 +475,48 @@ app.MapPost("/api/ai/keys", (AiKeyRequest request, AiService ai, HttpContext con
     .RequireAuthorization();
 
 // ---------- 图墙：SFW 图源代理 ----------
-app.MapGet("/api/gallery", async (int? page, string? tags, GalleryService gallery, CancellationToken cancellationToken) =>
-        Results.Ok(await gallery.FetchAsync(page ?? 1, tags, cancellationToken)))
+app.MapGet("/api/gallery", async (
+        int? page,
+        string? tags,
+        string? source,
+        HttpContext context,
+        GalleryService gallery,
+        FileRepository files,
+        CancellationToken cancellationToken) =>
+    {
+        if (string.Equals(source, "local", StringComparison.OrdinalIgnoreCase))
+        {
+            var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+            var images = files.ListFiles(owner)
+                .Where(file => IsImageName(file.Name))
+                .Select(file => new
+                {
+                    id = file.Id,
+                    previewUrl = "/files?handler=Download&id=" + file.Id,
+                    originalUrl = "/files?handler=Download&id=" + file.Id,
+                    width = 0,
+                    height = 0,
+                    tags = file.Name,
+                    source = "local",
+                })
+                .ToList();
+
+            return Results.Ok(images);
+        }
+
+        return Results.Ok(await gallery.FetchAsync(page ?? 1, tags, cancellationToken, source));
+    })
     .RequireAuthorization();
+
+static bool IsImageName(string name)
+{
+    var extension = Path.GetExtension(name);
+    return extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase)
+        || extension.Equals(".jpeg", StringComparison.OrdinalIgnoreCase)
+        || extension.Equals(".png", StringComparison.OrdinalIgnoreCase)
+        || extension.Equals(".webp", StringComparison.OrdinalIgnoreCase)
+        || extension.Equals(".gif", StringComparison.OrdinalIgnoreCase);
+}
 
 app.MapGet("/api/gallery/image", async (string url, GalleryService gallery, HttpContext context, CancellationToken cancellationToken) =>
     {
