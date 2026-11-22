@@ -1,0 +1,72 @@
+@page "/steward"
+@model Genkan.Pages.StewardModel
+@{
+    ViewData["Title"] = "代理站长";
+}
+<link rel="stylesheet" href="/assets/css/ai.css" asp-append-version="true" />
+
+<section class="ai-shell ai-shell-single" id="steward">
+    <div class="ai-main">
+        <header class="ai-head">
+            <div>
+                <p class="eyebrow">STEWARD</p>
+                <strong>代理站长</strong>
+            </div>
+            <span class="ai-head-actions">
+                @if (Model.Providers.Count > 0)
+                {
+                    <select id="steward-provider">
+                        @foreach (var provider in Model.Providers)
+                        {
+                            <option value="@provider.Id" selected="@(provider.Id == Model.DefaultProvider)">
+                                @provider.Name
+                            </option>
+                        }
+                    </select>
+                }
+                <button class="link" type="button" id="steward-clear">清空对话</button>
+            </span>
+        </header>
+
+        @if (Model.Providers.Count == 0)
+        {
+            <div class="alert">
+                还没有可用的 AI 供应商。先去 <a class="link" href="/ai">/ai</a> 填一个 Key。
+            </div>
+        }
+
+        <div class="ai-messages" id="steward-messages">
+            @if (Model.History.Count == 0)
+            {
+                <div class="ai-welcome">
+                    <p class="ai-welcome-title">今天要我做什么？</p>
+                    <p class="muted small">
+                        我能查站点体检、读写笔记、读博客、存草稿、看上传的文件、往剪贴板塞东西。
+                        但不能删除任何东西。
+                    </p>
+                    <p class="muted small">试试：「看看站点现在有什么问题」「把今天的待办写进笔记」「列一下最近的博客草稿」</p>
+                </div>
+            }
+            else
+            {
+                @foreach (var message in Model.History)
+                {
+                    <article class="ai-bubble ai-@(message.Role == "user" ? "user" : "assistant")">
+                        <div class="ai-text">@message.Content</div>
+                    </article>
+                }
+            }
+        </div>
+
+        <form class="ai-input" id="steward-form">
+            <textarea id="steward-text" rows="3" placeholder="让代理站长做点事…（Ctrl + Enter 发送）"></textarea>
+            <button class="btn" type="submit" id="steward-send">发送</button>
+        </form>
+
+        <p class="muted small">
+            工具在服务器上执行；数据库、笔记、草稿的写入都会进审计日志。删除、恢复、备份不在它的能力范围内。
+        </p>
+    </div>
+</section>
+
+<script src="/assets/js/steward.js" asp-append-version="true"></script>

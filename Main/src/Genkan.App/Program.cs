@@ -13,6 +13,7 @@ using Genkan.Data;
 using Genkan.Files;
 using Genkan.Notes;
 using Genkan.Security;
+using Genkan.Steward;
 using Genkan.Sync;
 using Genkan.Theme;
 using Genkan.Sys;
@@ -114,6 +115,9 @@ builder.Services.AddHttpClient("syncthing", client => client.Timeout = TimeSpan.
 builder.Services.AddSingleton<AiCatalog>();
 builder.Services.AddSingleton<AiService>();
 builder.Services.AddSingleton<ChatStore>();
+
+// 代理站长（AI 工具调用）
+builder.Services.AddSingleton<StewardService>();
 builder.Services.AddHttpClient("ai", client => client.Timeout = TimeSpan.FromMinutes(5));
 
 // 二次验证与临时提权
@@ -458,6 +462,75 @@ app.MapPost("/api/ai/keys", (AiKeyRequest request, AiService ai, HttpContext con
         }
 
         ai.SaveKey(request.ProviderId, request.Key);
+        return Results.Ok(new { ok = true });
+    })
+    .RequireAuthorization();
+
+// ---------- 代理站长：AI 用工具替站长干活（仅 admin） ----------
+app.MapPost("/api/steward/chat", async (
+        HttpContext context,
+        StewardRequest request,
+        StewardService steward,
+        AiService ai,
+        ChatStore store,
+        AuditLog audit,
+        CancellationToken cancellationToken) =>
+    {
+        if (!context.User.IsInRole("admin"))
+        {
+            return Results.Forbid();
+        }
+
+        var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        var provider = ai.Catalog.Find(request.ProviderId);
+        if (provider is null)
+        {
+            return Results.BadRequest(new { error = "未知的供应商。" });
+        }
+
+        if (!ai.HasKey(provider.Id))
+        {
+            return Results.BadRequest(new { error = provider.Name + " 还没有配置 API Key。" });
+        }
+
+        var text = (request.Message ?? string.Empty).Trim();
+        if (text.Length == 0)
+        {
+            return Results.BadRequest(new { error = "消息是空的。" });
+        }
+
+        var document = store.Load(owner, "steward-main") ?? new ChatDocument
+        {
+            Id = "steward-main",
+            Title = "代理站长",
+            Provider = provider.Id,
+            Model = provider.Model,
+        };
+
+        document.Messages.Add(new ChatMessage { Role = "user", Content = text });
+
+        var result = await steward.RunAsync(provider, document.Messages, owner, cancellationToken);
+
+        document.Messages.Add(new ChatMessage { Role = "assistant", Content = result.Reply });
+        document.Provider = provider.Id;
+        document.Model = provider.Model;
+        store.Save(owner, document);
+
+        audit.Write(context, "steward.chat", string.Join(",", result.Trace.Take(5)), "ok");
+
+        return Results.Ok(new { reply = result.Reply, trace = result.Trace, chatId = document.Id });
+    })
+    .RequireAuthorization();
+
+app.MapDelete("/api/steward/chat", (HttpContext context, ChatStore store) =>
+    {
+        if (!context.User.IsInRole("admin"))
+        {
+            return Results.Forbid();
+        }
+
+        var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        store.Delete(owner, "steward-main");
         return Results.Ok(new { ok = true });
     })
     .RequireAuthorization();
