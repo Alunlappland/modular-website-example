@@ -20,6 +20,7 @@
   const source = page.dataset.source || '';
   const view = page.dataset.view || 'all';
   let activeCollection = page.dataset.collection || '';
+  let collectionsCache = [];
 
   const state = {
     blocked: new Set(),
@@ -130,7 +131,7 @@
             originalUrl: item.originalUrl,
             source: item.source,
             tags: item.tags,
-            collectionId: view === 'favorites' && activeCollection && activeCollection !== 'none' ? activeCollection : null,
+            collectionId: targetCollectionId(),
           }),
         });
         state.favorites.add(key);
@@ -254,7 +255,11 @@
 
       const data = await response.json();
       state.blocked = new Set(data.blockedTags || []);
-      state.favorites = new Set(data.favorites || []);
+      state.favorites = new Set((data.favorites || []).map((entry) => entry.key || entry));
+      state.favoriteCollection = {};
+      (data.favorites || []).forEach((entry) => {
+        if (entry.key) state.favoriteCollection[entry.key] = entry.collectionId || '';
+      });
       renderBlocked();
       renderHistory(data.history);
     } catch (error) { /* 偏好加载失败不影响看图 */ }
@@ -348,8 +353,71 @@
     if (state.current) toggleFavorite(state.current, null);
   });
 
+  function targetCollectionId() {
+    const select = document.getElementById('gallery-target');
+    const value = select ? select.value : '';
+    return value && value !== 'none' ? value : null;
+  }
+
+  function rememberTarget(value) {
+    try { localStorage.setItem('genkan.gallery.target', value || 'none'); } catch (error) { /* 忽略 */ }
+  }
+
+  function savedTarget() {
+    try { return localStorage.getItem('genkan.gallery.target') || ''; } catch (error) { return ''; }
+  }
+
+  function fillSelect(select, includeAll) {
+    if (!select) return;
+
+    select.textContent = '';
+
+    if (includeAll) {
+      select.appendChild(new Option('全部', ''));
+    }
+
+    select.appendChild(new Option('未分类', 'none'));
+    collectionsCache.forEach((collection) => {
+      select.appendChild(new Option(collection.name + '（' + collection.count + '）', collection.id));
+    });
+  }
+
+  function updateLightboxMove() {
+    const select = document.getElementById('gallery-lightbox-move');
+    if (!select) return;
+
+    if (!state.current || !state.favorites.has(keyOf(state.current))) {
+      select.hidden = true;
+      return;
+    }
+
+    select.hidden = false;
+    fillSelect(select, false);
+    select.value = state.favoriteCollection[keyOf(state.current)] || 'none';
+  }
+
   async function loadCollections() {
     const box = document.getElementById('gallery-collections');
+
+    try {
+      const response = await fetch('/api/gallery/collections', { headers: { Accept: 'application/json' } });
+      collectionsCache = response.ok ? await response.json() : [];
+    } catch (error) {
+      collectionsCache = [];
+    }
+
+    // 顶部「收藏到」
+    const target = document.getElementById('gallery-target');
+    if (target) {
+      const desired = activeCollection && activeCollection !== 'none' ? activeCollection : savedTarget();
+      fillSelect(target, false);
+      if (desired && Array.from(target.options).some((option) => option.value === desired)) {
+        target.value = desired;
+      }
+      target.addEventListener('change', () => rememberTarget(target.value));
+    }
+
+    // 收藏模式下的收藏夹条
     if (!box) return;
 
     if (view !== 'favorites') {
@@ -360,68 +428,75 @@
     box.hidden = false;
     box.textContent = '';
 
-    try {
-      const response = await fetch('/api/gallery/collections', { headers: { Accept: 'application/json' } });
-      const collections = response.ok ? await response.json() : [];
+    const all = document.createElement('a');
+    all.className = 'chip' + (activeCollection === '' ? ' on' : '');
+    all.href = '/gallery?view=favorites';
+    all.textContent = '全部';
+    box.appendChild(all);
 
-      const all = document.createElement('a');
-      all.className = 'chip' + (activeCollection === '' ? ' on' : '');
-      all.href = '/gallery?view=favorites';
-      all.textContent = '全部';
-      box.appendChild(all);
+    const none = document.createElement('a');
+    none.className = 'chip' + (activeCollection === 'none' ? ' on' : '');
+    none.href = '/gallery?view=favorites&collection=none';
+    none.textContent = '未分类';
+    box.appendChild(none);
 
-      const none = document.createElement('a');
-      none.className = 'chip' + (activeCollection === 'none' ? ' on' : '');
-      none.href = '/gallery?view=favorites&collection=none';
-      none.textContent = '未分类';
-      box.appendChild(none);
+    collectionsCache.forEach((collection) => {
+      const chip = document.createElement('a');
+      chip.className = 'chip' + (activeCollection === collection.id ? ' on' : '');
+      chip.href = '/gallery?view=favorites&collection=' + encodeURIComponent(collection.id);
+      chip.textContent = collection.name + '（' + collection.count + '）';
+      box.appendChild(chip);
 
-      collections.forEach((collection) => {
-        const chip = document.createElement('a');
-        chip.className = 'chip' + (activeCollection === collection.id ? ' on' : '');
-        chip.href = '/gallery?view=favorites&collection=' + encodeURIComponent(collection.id);
-        chip.textContent = collection.name + '（' + collection.count + '）';
-        box.appendChild(chip);
-
-        const remove = document.createElement('button');
-        remove.type = 'button';
-        remove.className = 'chip gallery-collection-del';
-        remove.textContent = '×';
-        remove.title = '删除收藏夹（里面的图会回到未分类）';
-        remove.addEventListener('click', async () => {
-          if (!window.confirm('删除收藏夹「' + collection.name + '」？图片会回到「未分类」。')) return;
-          await fetch('/api/gallery/collections?id=' + encodeURIComponent(collection.id), { method: 'DELETE' });
-          window.location.href = '/gallery?view=favorites';
-        });
-        box.appendChild(remove);
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'chip gallery-collection-del';
+      remove.textContent = '×';
+      remove.title = '删除收藏夹（里面的图会回到未分类）';
+      remove.addEventListener('click', async () => {
+        if (!window.confirm('删除收藏夹「' + collection.name + '」？图片会回到「未分类」。')) return;
+        await fetch('/api/gallery/collections?id=' + encodeURIComponent(collection.id), { method: 'DELETE' });
+        window.location.href = '/gallery?view=favorites';
       });
+      box.appendChild(remove);
+    });
 
-      const create = document.createElement('button');
-      create.type = 'button';
-      create.className = 'chip gallery-collection-new';
-      create.textContent = '＋ 新建收藏夹';
-      create.addEventListener('click', async () => {
-        const name = window.prompt('收藏夹名字（比如：壁纸、老婆、夜景）');
-        if (!name) return;
+    const create = document.createElement('button');
+    create.type = 'button';
+    create.className = 'chip gallery-collection-new';
+    create.textContent = '＋ 新建收藏夹';
+    create.addEventListener('click', () => createCollection());
+    box.appendChild(create);
+  }
 
-        const response2 = await fetch('/api/gallery/collections', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name }),
-        });
+  async function createCollection() {
+    const name = window.prompt('收藏夹名字（比如：壁纸、老婆、夜景）');
+    if (!name) return;
 
-        if (response2.ok) {
-          const data = await response2.json();
-          window.location.href = '/gallery?view=favorites&collection=' + encodeURIComponent(data.id);
-        } else {
-          window.alert('创建失败。');
-        }
-      });
-      box.appendChild(create);
-    } catch (error) {
-      box.textContent = '收藏夹加载失败：' + error.message;
+    const response = await fetch('/api/gallery/collections', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+
+    if (!response.ok) {
+      window.alert('创建失败。');
+      return;
+    }
+
+    const data = await response.json();
+    await loadCollections();
+
+    const target = document.getElementById('gallery-target');
+    if (target) {
+      target.value = data.id;
+      rememberTarget(data.id);
+    }
+
+    if (view === 'favorites') {
+      window.location.href = '/gallery?view=favorites&collection=' + encodeURIComponent(data.id);
     }
   }
+
 
   (async () => {
     await loadPrefs();

@@ -505,7 +505,7 @@ app.MapGet("/api/gallery/prefs", (HttpContext context, GalleryPrefsRepository pr
         return Results.Ok(new
         {
             blockedTags = prefs.BlockedTags(owner).Select(row => row.Tag),
-            favorites = prefs.Favorites(owner).Select(row => row.ImageKey),
+            favorites = prefs.Favorites(owner).Select(row => new { key = row.ImageKey, collectionId = row.CollectionId }),
             history = prefs.History(owner).Select(row => new { query = row.Query, source = row.Source }),
         });
     })
@@ -529,7 +529,11 @@ app.MapGet("/api/gallery/favorites", (HttpContext context, GalleryPrefsRepositor
     })
     .RequireAuthorization();
 
-app.MapPost("/api/gallery/favorite", (GalleryFavoriteRequest request, HttpContext context, GalleryPrefsRepository prefs) =>
+app.MapPost("/api/gallery/favorite", (
+        GalleryFavoriteRequest request,
+        HttpContext context,
+        GalleryPrefsRepository prefs,
+        GalleryService gallery) =>
     {
         var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
         if (string.IsNullOrWhiteSpace(request.PreviewUrl) || string.IsNullOrWhiteSpace(request.OriginalUrl))
@@ -538,6 +542,7 @@ app.MapPost("/api/gallery/favorite", (GalleryFavoriteRequest request, HttpContex
         }
 
         var key = request.ImageKey ?? (request.Source + ":" + request.Id);
+
         prefs.AddFavorite(owner, new FavoriteRow
         {
             ImageKey = key,
@@ -545,9 +550,40 @@ app.MapPost("/api/gallery/favorite", (GalleryFavoriteRequest request, HttpContex
             OriginalUrl = request.OriginalUrl,
             Source = request.Source ?? "unknown",
             Tags = request.Tags,
+            CollectionId = request.CollectionId,
+        });
+
+        // 原图下载放后台，别让收藏按钮等上游
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var path = await gallery.SaveLocalCopyAsync(owner, key, request.OriginalUrl, CancellationToken.None);
+                if (!string.IsNullOrWhiteSpace(path))
+                {
+                    prefs.SetLocalPath(owner, key, path);
+                }
+            }
+            catch
+            {
+                // 抓不到就继续用外链
+            }
         });
 
         return Results.Ok(new { ok = true, key });
+    })
+    .RequireAuthorization();
+
+app.MapPost("/api/gallery/favorite/move", (GalleryMoveRequest request, HttpContext context, GalleryPrefsRepository prefs) =>
+    {
+        var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        if (string.IsNullOrWhiteSpace(request.Key))
+        {
+            return Results.BadRequest(new { error = "缺少 key。" });
+        }
+
+        prefs.UpdateCollection(owner, request.Key, request.CollectionId);
+        return Results.Ok(new { ok = true });
     })
     .RequireAuthorization();
 

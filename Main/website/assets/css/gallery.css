@@ -91,3 +91,14 @@ body.gallery-locked { overflow: hidden; }
   border: 1px solid var(--line); color: var(--ink-soft);
 }
 .gallery-mode.on { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); font-weight: 600; }
+
+/* 收藏目标选择 + 灯箱层级修正 */
+.gallery-target { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.gallery-target select,
+.gallery-lightbox-actions select {
+  padding: 7px 10px; border-radius: 9px; border: 1px solid var(--line);
+  background: var(--card-solid); color: var(--ink); font-size: 13px;
+}
+.gallery-lightbox-actions select { background: rgba(255,255,255,0.12); color: #fff; border-color: rgba(255,255,255,0.3); }
+.gallery-lightbox img { position: relative; z-index: 1; }
+.gallery-close { z-index: 5; }

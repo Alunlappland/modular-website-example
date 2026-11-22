@@ -145,6 +145,14 @@ public sealed class GalleryPrefsRepository
             new { owner, imageKey, localPath });
     }
 
+    public void UpdateCollection(string owner, string imageKey, string? collectionId)
+    {
+        using var connection = _db.Open();
+        connection.Execute(
+            "UPDATE gallery_favorites SET collection_id = @collectionId WHERE owner = @owner AND image_key = @imageKey",
+            new { owner, imageKey, collectionId = string.IsNullOrWhiteSpace(collectionId) ? null : collectionId });
+    }
+
     public bool RemoveFavorite(string owner, string imageKey)
     {
         using var connection = _db.Open();
@@ -185,7 +193,14 @@ public sealed class GalleryPrefsRepository
     {
         using var connection = _db.Open();
         return connection.Query<TagHistoryRow>(
-            "SELECT query, source, created_at FROM gallery_tag_history WHERE owner = @owner ORDER BY created_at DESC LIMIT @limit",
+            """
+            SELECT query, MAX(source) AS source, MAX(created_at) AS created_at
+            FROM gallery_tag_history
+            WHERE owner = @owner
+            GROUP BY query
+            ORDER BY created_at DESC
+            LIMIT @limit
+            """,
             new { owner, limit }).ToList();
     }
 
@@ -197,6 +212,12 @@ public sealed class GalleryPrefsRepository
         }
 
         using var connection = _db.Open();
+
+        // 同一个标签只留一条，重新搜就置顶
+        connection.Execute(
+            "DELETE FROM gallery_tag_history WHERE owner = @owner AND query = @query",
+            new { owner, query = query.Trim() });
+
         connection.Execute(
             "INSERT INTO gallery_tag_history(id, owner, query, source, created_at) VALUES (@id, @owner, @query, @source, @createdAt)",
             new

@@ -53,8 +53,9 @@ public class GalleryModel : PageModel
             ? (View == "favorites" ? string.Empty : _gallery.DefaultTags)
             : tags.Trim();
 
-        // 只记用户主动搜过的标签，避免翻页也写历史
-        if (!string.IsNullOrWhiteSpace(tags) && View == "all")
+        // 只记用户主动搜过的标签：默认标签不记，避免出现一堆 safe
+        var isDefault = string.Equals(Tags, _gallery.DefaultTags, StringComparison.OrdinalIgnoreCase);
+        if (!string.IsNullOrWhiteSpace(tags) && !isDefault && View == "all")
         {
             var owner = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
             _prefs.RecordHistory(owner, Tags, Source);

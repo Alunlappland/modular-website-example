@@ -38,6 +38,12 @@
         <a class="gallery-mode @(Model.View == "favorites" ? "on" : "")" href="/gallery?view=favorites">♥ 收藏</a>
     </nav>
 
+    <div class="gallery-target">
+        <span class="muted small">收藏到</span>
+        <select id="gallery-target" aria-label="收藏到哪个收藏夹"></select>
+        <button class="chip gallery-collection-new" type="button" id="gallery-target-new">＋ 新建</button>
+    </div>
+
     @if (Model.View == "all")
     {
         <div class="gallery-sources">
@@ -78,6 +84,7 @@
     <div class="gallery-caption" id="gallery-caption"></div>
     <div class="gallery-lightbox-actions">
         <button class="btn ghost" type="button" id="gallery-lightbox-fav">♥ 收藏</button>
+        <select id="gallery-lightbox-move" hidden aria-label="移动到收藏夹"></select>
         <a class="btn ghost" id="gallery-lightbox-open" target="_blank" rel="noreferrer">在源站打开</a>
     </div>
 </div>
