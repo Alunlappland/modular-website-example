@@ -756,7 +756,8 @@ app.MapGet("/theme/background", (HttpContext context, ThemeService theme) =>
             return Results.NotFound();
         }
 
-        context.Response.Headers.CacheControl = "private, no-store";
+        // 私人图片：只允许浏览器私有缓存（CDN 不缓存）；URL 带 ?v= 版本号，换了图自然失效
+        context.Response.Headers.CacheControl = "private, max-age=604800";
         return Results.File(theme.BackgroundPath, theme.ContentType);
     })
     .RequireAuthorization();

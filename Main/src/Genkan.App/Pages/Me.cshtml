@@ -131,7 +131,7 @@
 
     <form method="post" asp-page-handler="Background" enctype="multipart/form-data" style="margin-top:14px">
         <label class="field">
-            <span>背景图（jpg / png / webp / gif，≤ 8MB）</span>
+            <span>背景图（jpg / png / webp / gif，≤ 8MB；建议压到 500KB 以内，手机才不卡）</span>
             <input asp-for="Background" type="file" accept="image/*" />
         </label>
         <button class="btn ghost" type="submit">上传背景</button>
