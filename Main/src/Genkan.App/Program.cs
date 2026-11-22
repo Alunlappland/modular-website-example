@@ -18,9 +18,9 @@ using Genkan.Theme;
 using Genkan.Sys;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http.Features;
-using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.StaticFiles;
@@ -169,6 +169,24 @@ builder.Services
         options.AccessDeniedPath = "/login?denied=1";
         options.ExpireTimeSpan = TimeSpan.FromDays(7);
         options.SlidingExpiration = true;
+
+        // 被禁用/删除的账号，已登录的 Cookie 也立即失效
+        options.Events.OnValidatePrincipal = async context =>
+        {
+            var id = context.Principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrWhiteSpace(id))
+            {
+                return;
+            }
+
+            var users = context.HttpContext.RequestServices.GetRequiredService<UserRepository>();
+            var current = users.FindById(id);
+            if (current is null || !current.Enabled)
+            {
+                context.RejectPrincipal();
+                await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            }
+        };
 
         options.Events.OnRedirectToLogin = context =>
         {

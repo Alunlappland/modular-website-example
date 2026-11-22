@@ -66,6 +66,34 @@ public sealed class UserRepository
             user);
     }
 
+    public int CountAdmins()
+    {
+        using var connection = _db.Open();
+        return connection.ExecuteScalar<int>("SELECT count(*) FROM users WHERE role = 'admin' AND enabled = 1");
+    }
+
+    public bool UpdateRole(string id, string role)
+    {
+        using var connection = _db.Open();
+        return connection.Execute(
+            "UPDATE users SET role = @role WHERE id = @id",
+            new { id, role }) > 0;
+    }
+
+    public bool SetEnabled(string id, bool enabled)
+    {
+        using var connection = _db.Open();
+        return connection.Execute(
+            "UPDATE users SET enabled = @enabled WHERE id = @id",
+            new { id, enabled }) > 0;
+    }
+
+    public bool Delete(string id)
+    {
+        using var connection = _db.Open();
+        return connection.Execute("DELETE FROM users WHERE id = @id", new { id }) > 0;
+    }
+
     public void TouchLogin(string id)
     {
         using var connection = _db.Open();

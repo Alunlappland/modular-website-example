@@ -104,8 +104,11 @@
                 }
                 @if (isAdmin)
                 {
-                    <a class="snav-link @Active("/admin")" href="/admin/routes">
+                    <a class="snav-link @Active("/admin/routes")" href="/admin/routes">
                         <span class="glyph">⚙</span><span>路由管理</span>
+                    </a>
+                    <a class="snav-link @(here.StartsWith("/admin/users", StringComparison.OrdinalIgnoreCase) ? "is-active" : "")" href="/admin/users">
+                        <span class="glyph">☰</span><span>账号管理</span>
                     </a>
                     <a class="snav-link @Active("/backup")" href="/backup">
                         <span class="glyph">⛁</span><span>备份</span>

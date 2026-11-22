@@ -1,0 +1,122 @@
+@page
+@model Genkan.Pages.Admin.UsersModel
+@{
+    ViewData["Title"] = "账号管理";
+}
+<link rel="stylesheet" href="/assets/css/admin.css" asp-append-version="true" />
+
+<section class="admin">
+    <header class="admin-head">
+        <div>
+            <p class="eyebrow">ADMIN · 仅本机</p>
+            <h1>账号管理</h1>
+        </div>
+        <p class="admin-hint">禁用或删除后，对方的登录状态会在下一次请求时立即失效。</p>
+    </header>
+
+    @if (!string.IsNullOrEmpty(Model.Error))
+    {
+        <div class="alert">@Model.Error</div>
+    }
+    @if (!string.IsNullOrEmpty(Model.Message))
+    {
+        <div class="notice">@Model.Message</div>
+    }
+
+    <div class="admin-table-wrap">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>账号</th>
+                    <th>显示名</th>
+                    <th>角色</th>
+                    <th>状态</th>
+                    <th>创建</th>
+                    <th>上次登录</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var user in Model.Users)
+                {
+                    <tr>
+                        <td><code>@user.Name</code></td>
+                        <td>@user.Display</td>
+                        <td>
+                            <form method="post" asp-page-handler="Role" class="inline-form">
+                                <input type="hidden" name="id" value="@user.Id" />
+                                <select name="role">
+                                    <option value="admin" selected="@(user.Role == "admin")">admin</option>
+                                    <option value="member" selected="@(user.Role == "member")">member</option>
+                                    <option value="guest" selected="@(user.Role == "guest")">guest</option>
+                                </select>
+                                <button class="link" type="submit">保存</button>
+                            </form>
+                        </td>
+                        <td>
+                            @if (user.Enabled)
+                            {
+                                <span class="tag on">启用</span>
+                            }
+                            else
+                            {
+                                <span class="tag off">禁用</span>
+                            }
+                        </td>
+                        <td>@(DateTimeOffset.TryParse(user.CreatedAt, out var created) ? created.ToLocalTime().ToString("MM-dd") : "—")</td>
+                        <td>@(DateTimeOffset.TryParse(user.LastLoginAt, out var login) ? login.ToLocalTime().ToString("MM-dd HH:mm") : "—")</td>
+                        <td class="ops">
+                            <form method="post" asp-page-handler="Toggle">
+                                <input type="hidden" name="id" value="@user.Id" />
+                                <button class="link" type="submit">@(user.Enabled ? "禁用" : "启用")</button>
+                            </form>
+                            <form method="post" asp-page-handler="ResetPassword" class="inline-form" onsubmit="return confirm('重置 @user.Name 的密码？');">
+                                <input type="hidden" name="id" value="@user.Id" />
+                                <input type="password" name="password" placeholder="新密码（≥10 位）" autocomplete="new-password" />
+                                <button class="link" type="submit">重置</button>
+                            </form>
+                            <form method="post" asp-page-handler="Delete" onsubmit="return confirm('删除账号 @user.Name？这个操作不可恢复。');">
+                                <input type="hidden" name="id" value="@user.Id" />
+                                <button class="link danger" type="submit">删除</button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <section class="admin-form" style="margin-top:18px">
+        <h2>新建账号</h2>
+        <form method="post" asp-page-handler="Create">
+            <div class="grid2">
+                <label class="field">
+                    <span>用户名（登录用）</span>
+                    <input asp-for="NewName" autocomplete="off" placeholder="比如 lab-pc" />
+                </label>
+                <label class="field">
+                    <span>显示名</span>
+                    <input asp-for="NewDisplay" autocomplete="off" placeholder="机房电脑" />
+                </label>
+                <label class="field">
+                    <span>角色</span>
+                    <select asp-for="NewRole">
+                        <option value="member">member · 日常使用</option>
+                        <option value="guest">guest · 只读博客</option>
+                        <option value="admin">admin · 管理员</option>
+                    </select>
+                </label>
+                <label class="field">
+                    <span>初始密码（≥10 位）</span>
+                    <input asp-for="NewPassword" type="password" autocomplete="new-password" />
+                </label>
+            </div>
+            <button class="btn" type="submit">创建账号</button>
+        </form>
+    </section>
+
+    <p class="muted small" style="margin-top:14px">
+        角色对应权限：<code>admin</code> 全部；<code>member</code> 有 chat.use / blog.read / files.read / files.write / sync.use / backup.view；
+        <code>guest</code> 只有 blog.read。改角色后对方要重新登录才会拿到新权限。
+    </p>
+</section>
