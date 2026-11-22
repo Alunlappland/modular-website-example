@@ -6,7 +6,8 @@
 <link rel="stylesheet" href="/assets/css/gallery.css" asp-append-version="true" />
 
 <section class="gallery-page" id="gallery"
-         data-tags="@Model.Tags" data-provider="@Model.Provider" data-source="@Model.Source">
+         data-tags="@Model.Tags" data-provider="@Model.Provider"
+         data-source="@Model.Source" data-view="@Model.View">
     <header class="gallery-head">
         <div>
             <p class="eyebrow">GALLERY</p>
@@ -26,7 +27,19 @@
             <a class="chip @(Model.Source == source.Id ? "on" : "")"
                href="/gallery?source=@source.Id&tags=@Uri.EscapeDataString(Model.Tags)">@source.Label</a>
         }
-        <span class="muted small">换源不影响已加载的图，点一下重新开始</span>
+        <span class="gallery-split"></span>
+        <a class="chip @(Model.View == "all" ? "on" : "")" href="/gallery?source=@Model.Source&tags=@Uri.EscapeDataString(Model.Tags)">全部</a>
+        <a class="chip @(Model.View == "favorites" ? "on" : "")" href="/gallery?source=@Model.Source&view=favorites">♥ 收藏</a>
+    </div>
+
+    <div class="gallery-blocked" id="gallery-blocked" hidden>
+        <span class="muted small">已屏蔽：</span>
+        <span class="gallery-blocked-list" id="gallery-blocked-list"></span>
+    </div>
+
+    <div class="gallery-history" id="gallery-history" hidden>
+        <span class="muted small">搜过：</span>
+        <span class="gallery-history-list" id="gallery-history-list"></span>
     </div>
 
     <div class="gallery-flow" id="gallery-flow"></div>
@@ -38,7 +51,11 @@
 <div class="gallery-lightbox" id="gallery-lightbox" hidden>
     <button class="gallery-close" type="button" id="gallery-close" aria-label="关闭">×</button>
     <img id="gallery-large" alt="" />
-    <p class="gallery-caption" id="gallery-caption"></p>
+    <div class="gallery-caption" id="gallery-caption"></div>
+    <div class="gallery-lightbox-actions">
+        <button class="btn ghost" type="button" id="gallery-lightbox-fav">♥ 收藏</button>
+        <a class="btn ghost" id="gallery-lightbox-open" target="_blank" rel="noreferrer">在源站打开</a>
+    </div>
 </div>
 
 <script src="/assets/js/gallery.js" asp-append-version="true"></script>

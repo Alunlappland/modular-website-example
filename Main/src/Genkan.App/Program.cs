@@ -121,6 +121,7 @@ builder.Services.AddSingleton<ChatStore>();
 
 // 代理站长（AI 工具调用）
 builder.Services.AddSingleton<GalleryService>();
+builder.Services.AddSingleton<GalleryPrefsRepository>();
 builder.Services.AddSingleton<StewardKnowledge>();
 builder.Services.AddSingleton<StewardService>();
 // 出网用的 HttpClient：可选走本机代理（.NET 不读 Windows 的代理设置，必须显式给）
@@ -493,6 +494,94 @@ app.MapPost("/api/ai/keys", (AiKeyRequest request, AiService ai, HttpContext con
         }
 
         ai.SaveKey(request.ProviderId, request.Key);
+        return Results.Ok(new { ok = true });
+    })
+    .RequireAuthorization();
+
+// ---------- 图墙偏好：收藏 / 屏蔽标签 / 搜索历史 ----------
+app.MapGet("/api/gallery/prefs", (HttpContext context, GalleryPrefsRepository prefs) =>
+    {
+        var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        return Results.Ok(new
+        {
+            blockedTags = prefs.BlockedTags(owner).Select(row => row.Tag),
+            favorites = prefs.Favorites(owner).Select(row => row.ImageKey),
+            history = prefs.History(owner).Select(row => new { query = row.Query, source = row.Source }),
+        });
+    })
+    .RequireAuthorization();
+
+app.MapGet("/api/gallery/favorites", (HttpContext context, GalleryPrefsRepository prefs) =>
+    {
+        var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        var items = prefs.Favorites(owner).Select(row => new
+        {
+            id = row.ImageKey,
+            previewUrl = row.PreviewUrl,
+            originalUrl = row.OriginalUrl,
+            width = 0,
+            height = 0,
+            tags = row.Tags ?? string.Empty,
+            source = row.Source,
+        });
+
+        return Results.Ok(items);
+    })
+    .RequireAuthorization();
+
+app.MapPost("/api/gallery/favorite", (GalleryFavoriteRequest request, HttpContext context, GalleryPrefsRepository prefs) =>
+    {
+        var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        if (string.IsNullOrWhiteSpace(request.PreviewUrl) || string.IsNullOrWhiteSpace(request.OriginalUrl))
+        {
+            return Results.BadRequest(new { error = "缺少图片地址。" });
+        }
+
+        var key = request.ImageKey ?? (request.Source + ":" + request.Id);
+        prefs.AddFavorite(owner, new FavoriteRow
+        {
+            ImageKey = key,
+            PreviewUrl = request.PreviewUrl,
+            OriginalUrl = request.OriginalUrl,
+            Source = request.Source ?? "unknown",
+            Tags = request.Tags,
+        });
+
+        return Results.Ok(new { ok = true, key });
+    })
+    .RequireAuthorization();
+
+app.MapDelete("/api/gallery/favorite", (string key, HttpContext context, GalleryPrefsRepository prefs) =>
+    {
+        var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        return Results.Ok(new { ok = prefs.RemoveFavorite(owner, key) });
+    })
+    .RequireAuthorization();
+
+app.MapPost("/api/gallery/block", (GalleryTagRequest request, HttpContext context, GalleryPrefsRepository prefs) =>
+    {
+        var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        if (string.IsNullOrWhiteSpace(request.Tag))
+        {
+            return Results.BadRequest(new { error = "标签是空的。" });
+        }
+
+        prefs.BlockTag(owner, request.Tag.Trim());
+        return Results.Ok(new { ok = true });
+    })
+    .RequireAuthorization();
+
+app.MapDelete("/api/gallery/block", (string tag, HttpContext context, GalleryPrefsRepository prefs) =>
+    {
+        var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        return Results.Ok(new { ok = prefs.UnblockTag(owner, tag) });
+    })
+    .RequireAuthorization();
+
+app.MapPost("/api/gallery/history", (GalleryHistoryRequest request, HttpContext context, GalleryPrefsRepository prefs) =>
+    {
+        var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        prefs.RecordHistory(owner, request.Query ?? string.Empty, request.Source ?? string.Empty);
         return Results.Ok(new { ok = true });
     })
     .RequireAuthorization();

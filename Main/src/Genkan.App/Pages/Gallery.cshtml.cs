@@ -1,6 +1,7 @@
 using Genkan.Gallery;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using System.Security.Claims;
 
 namespace Genkan.Pages;
 
@@ -8,16 +9,23 @@ namespace Genkan.Pages;
 public class GalleryModel : PageModel
 {
     private readonly GalleryService _gallery;
+    private readonly GalleryPrefsRepository _prefs;
 
-    public GalleryModel(GalleryService gallery) => _gallery = gallery;
+    public GalleryModel(GalleryService gallery, GalleryPrefsRepository prefs)
+    {
+        _gallery = gallery;
+        _prefs = prefs;
+    }
 
     public string Tags { get; private set; } = "safe";
 
-    public string Provider { get; private set; } = "konachan";
-
-    public string ProviderLabel => Provider == "safebooru" ? "safebooru" : "konachan.net";
+    public string Provider { get; private set; } = "safebooru";
 
     public string Source { get; private set; } = "safebooru";
+
+    public string View { get; private set; } = "all";
+
+    public string ProviderLabel => Source == "local" ? "本地" : Source;
 
     public IReadOnlyList<(string Id, string Label)> Sources { get; } = new[]
     {
@@ -27,7 +35,7 @@ public class GalleryModel : PageModel
         ("local", "本地（我上传的）"),
     };
 
-    public void OnGet(string? tags, string? source)
+    public void OnGet(string? tags, string? source, string? view)
     {
         Provider = _gallery.Provider;
         Source = string.IsNullOrWhiteSpace(source) ? Provider : source.Trim().ToLowerInvariant();
@@ -36,6 +44,14 @@ public class GalleryModel : PageModel
             Source = Provider;
         }
 
+        View = string.Equals(view, "favorites", StringComparison.OrdinalIgnoreCase) ? "favorites" : "all";
         Tags = string.IsNullOrWhiteSpace(tags) ? _gallery.DefaultTags : tags.Trim();
+
+        // 只记用户主动搜过的标签，避免翻页也写历史
+        if (!string.IsNullOrWhiteSpace(tags) && View == "all")
+        {
+            var owner = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+            _prefs.RecordHistory(owner, Tags, Source);
+        }
     }
 }

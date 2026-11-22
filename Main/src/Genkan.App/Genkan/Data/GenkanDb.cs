@@ -168,6 +168,36 @@ public sealed class GenkanDb
 
         CREATE INDEX IF NOT EXISTS ix_clips_owner ON clips(owner, created_at);
 
+        CREATE TABLE IF NOT EXISTS gallery_favorites (
+            id           TEXT PRIMARY KEY,
+            owner        TEXT NOT NULL,
+            image_key    TEXT NOT NULL,
+            preview_url  TEXT NOT NULL,
+            original_url TEXT NOT NULL,
+            source       TEXT NOT NULL,
+            tags         TEXT,
+            created_at   TEXT NOT NULL
+        );
+
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_gallery_favorite ON gallery_favorites(owner, image_key);
+
+        CREATE TABLE IF NOT EXISTS gallery_blocked_tags (
+            id         TEXT PRIMARY KEY,
+            owner      TEXT NOT NULL,
+            tag        TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_gallery_blocked ON gallery_blocked_tags(owner, tag);
+
+        CREATE TABLE IF NOT EXISTS gallery_tag_history (
+            id         TEXT PRIMARY KEY,
+            owner      TEXT NOT NULL,
+            query      TEXT NOT NULL,
+            source     TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+
         INSERT INTO settings(key, value, updated_at)
         VALUES ('schema_version', '1', datetime('now'))
         ON CONFLICT(key) DO NOTHING;
