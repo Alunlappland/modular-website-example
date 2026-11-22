@@ -20,7 +20,7 @@ public sealed class GalleryService
 {
     private static readonly string[] AllowedHosts =
     {
-        "konachan.net", "konachan.com", "safebooru.org", "img.safebooru.org",
+        "konachan.net", "konachan.com", "safebooru.org", "img.safebooru.org", "wallhaven.cc", "th.wallhaven.cc",
     };
 
     private readonly IHttpClientFactory _http;
@@ -46,7 +46,7 @@ public sealed class GalleryService
         page = Math.Clamp(page, 1, 200);
         var tagQuery = string.IsNullOrWhiteSpace(tags) ? DefaultTags : tags.Trim();
         var provider = string.IsNullOrWhiteSpace(providerOverride) ? Provider : providerOverride.Trim().ToLowerInvariant();
-        if (provider is not ("safebooru" or "konachan"))
+        if (provider is not ("safebooru" or "konachan" or "wallhaven"))
         {
             provider = Provider;
         }
@@ -58,17 +58,18 @@ public sealed class GalleryService
             return cached.Items;
         }
 
-        var items = provider == "safebooru"
-            ? await FetchSafebooruAsync(page, tagQuery, cancellationToken)
-            : await FetchKonachanAsync(page, tagQuery, cancellationToken);
+        var items = provider switch
+        {
+            "wallhaven" => await FetchWallhavenAsync(page, tagQuery, cancellationToken),
+            "konachan" => await FetchKonachanAsync(page, tagQuery, cancellationToken),
+            _ => await FetchSafebooruAsync(page, tagQuery, cancellationToken),
+        };
 
         // 主源被墙/403 时自动试另一个
         if (items.Count == 0)
         {
             _logger.LogInformation("主图源没有结果，尝试备用源");
-            items = provider == "safebooru"
-                ? await FetchKonachanAsync(page, tagQuery, cancellationToken)
-                : await FetchSafebooruAsync(page, tagQuery, cancellationToken);
+            items = await FetchSafebooruAsync(page, tagQuery, cancellationToken);
         }
 
         // 只缓存有内容的结果，失败下回还能重试
@@ -143,6 +144,72 @@ public sealed class GalleryService
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "拉取 konachan 失败");
+            return Array.Empty<GalleryImage>();
+        }
+    }
+
+    private async Task<IReadOnlyList<GalleryImage>> FetchWallhavenAsync(int page, string tags, CancellationToken cancellationToken)
+    {
+        var baseUrl = _config["gallery:baseUrl"];
+        if (string.IsNullOrWhiteSpace(baseUrl))
+        {
+            baseUrl = "https://wallhaven.cc";
+        }
+
+        // purity=100 只取 SFW；categories=010 只看二次元
+        var url = $"{baseUrl.TrimEnd('/')}/api/v1/search?categories=010&purity=100&sorting=random&page={page}" +
+                  (string.IsNullOrWhiteSpace(tags) ? string.Empty : "&q=" + Uri.EscapeDataString(tags));
+
+        var client = _http.CreateClient("gallery");
+
+        try
+        {
+            using var response = await client.GetAsync(url, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("wallhaven 返回 {Status}", (int)response.StatusCode);
+                return Array.Empty<GalleryImage>();
+            }
+
+            using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
+            if (!document.RootElement.TryGetProperty("data", out var data))
+            {
+                return Array.Empty<GalleryImage>();
+            }
+
+            var list = new List<GalleryImage>();
+
+            foreach (var node in data.EnumerateArray())
+            {
+                var original = node.TryGetProperty("path", out var path) ? path.GetString() ?? "" : "";
+                var preview = original;
+                if (node.TryGetProperty("thumbs", out var thumbs) &&
+                    thumbs.TryGetProperty("large", out var large) &&
+                    large.ValueKind == JsonValueKind.String)
+                {
+                    preview = large.GetString() ?? original;
+                }
+
+                if (string.IsNullOrEmpty(original) || string.IsNullOrEmpty(preview))
+                {
+                    continue;
+                }
+
+                list.Add(new GalleryImage(
+                    node.TryGetProperty("id", out var idNode) ? idNode.GetString() ?? "" : "",
+                    preview,
+                    original,
+                    node.TryGetProperty("dimension_x", out var w) && w.TryGetInt32(out var width) ? width : 0,
+                    node.TryGetProperty("dimension_y", out var h) && h.TryGetInt32(out var height) ? height : 0,
+                    "anime",
+                    "wallhaven"));
+            }
+
+            return list;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "拉取 wallhaven 失败");
             return Array.Empty<GalleryImage>();
         }
     }

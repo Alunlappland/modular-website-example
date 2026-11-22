@@ -23,6 +23,7 @@ public class GalleryModel : PageModel
     {
         ("safebooru", "safebooru"),
         ("konachan", "konachan.net"),
+        ("wallhaven", "wallhaven"),
         ("local", "本地（我上传的）"),
     };
 
@@ -30,7 +31,7 @@ public class GalleryModel : PageModel
     {
         Provider = _gallery.Provider;
         Source = string.IsNullOrWhiteSpace(source) ? Provider : source.Trim().ToLowerInvariant();
-        if (Source is not ("safebooru" or "konachan" or "local"))
+        if (Source is not ("safebooru" or "konachan" or "wallhaven" or "local"))
         {
             Source = Provider;
         }

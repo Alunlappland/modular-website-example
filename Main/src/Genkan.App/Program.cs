@@ -1,3 +1,4 @@
+using System.Net;
 using System.Reflection;
 using System.Security.Claims;
 using System.Text;
@@ -121,12 +122,30 @@ builder.Services.AddSingleton<ChatStore>();
 builder.Services.AddSingleton<GalleryService>();
 builder.Services.AddSingleton<StewardKnowledge>();
 builder.Services.AddSingleton<StewardService>();
-builder.Services.AddHttpClient("ai", client => client.Timeout = TimeSpan.FromMinutes(5));
-builder.Services.AddHttpClient("gallery", client =>
+// 出网用的 HttpClient：可选走本机代理（.NET 不读 Windows 的代理设置，必须显式给）
+var outboundProxy = builder.Configuration["network:proxy"];
+
+static HttpMessageHandler ProxyHandler(string? proxyUrl)
 {
-    client.Timeout = TimeSpan.FromSeconds(20);
-    client.DefaultRequestHeaders.UserAgent.ParseAdd("Genkan/1.0 (personal site)");
-});
+    var handler = new HttpClientHandler();
+    if (!string.IsNullOrWhiteSpace(proxyUrl))
+    {
+        handler.Proxy = new WebProxy(proxyUrl.Trim());
+        handler.UseProxy = true;
+    }
+
+    return handler;
+}
+
+builder.Services.AddHttpClient("ai", client => client.Timeout = TimeSpan.FromMinutes(5))
+    .ConfigurePrimaryHttpMessageHandler(() => ProxyHandler(outboundProxy));
+
+builder.Services.AddHttpClient("gallery", client =>
+    {
+        client.Timeout = TimeSpan.FromSeconds(25);
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Genkan/1.0");
+    })
+    .ConfigurePrimaryHttpMessageHandler(() => ProxyHandler(outboundProxy));
 
 // 二次验证与临时提权
 builder.Services.AddSingleton<ElevationService>();
