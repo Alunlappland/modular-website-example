@@ -88,6 +88,21 @@ website\
 - `Tools\install-syncthing.ps1` 跑一次，把 API Key 填进 `conf/appsettings.json` 的 `sync:syncthing:apiKey`。
 - 想让备份有异地副本：给 rclone 配好网盘（计划是 Cloudflare R2），目前只有本机一份。
 
+## 内网直连（比隧道快）
+
+站点默认监听 `0.0.0.0:8080`，同一局域网或虚拟局域网（ZeroTier / EasyTier）里的设备可以直连，
+不经过 Cloudflare，速度取决于本地链路。
+
+1. 管理员跑一次防火墙放行（只对「专用网络」开放）：
+   ``powershell
+   powershell -ExecutionPolicy Bypass -File .\Tools\open-lan-firewall.ps1
+   ``
+2. 手机装 ZeroTier / EasyTier，加入同一个网络。
+3. 访问 `http://<虚拟网卡IP>:8080`，IP 可以在 `/diagnostics` 的「直连地址」里看到。
+
+注意：`/admin/*` 仍然只允许本机回环访问，直连进来只能看公开页面和自己账号的内容。
+Cloudflare 隧道继续给不在虚拟网络里的访客用。
+
 ## 技术栈（实际用的）
 
 .NET 10 / ASP.NET Core（Razor Pages + Minimal API）· Markdig · SQLite + Dapper ·

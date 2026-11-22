@@ -1,3 +1,6 @@
+using System.Net;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using Dapper;
 using Genkan.Ai;
 using Genkan.Backup;
@@ -156,6 +159,31 @@ public sealed class DiagnosticsService
         catch (Exception ex)
         {
             checks.Add(new DiagnosticCheck("同步", "fail", ex.Message));
+        }
+
+        // 内网/虚拟网卡直连地址
+        try
+        {
+            var addresses = NetworkInterface.GetAllNetworkInterfaces()
+                .Where(nic => nic.OperationalStatus == OperationalStatus.Up &&
+                              nic.NetworkInterfaceType != NetworkInterfaceType.Loopback)
+                .SelectMany(nic => nic.GetIPProperties().UnicastAddresses)
+                .Select(address => address.Address)
+                .Where(address => address.AddressFamily == AddressFamily.InterNetwork)
+                .Select(address => address.ToString())
+                .Distinct()
+                .ToList();
+
+            checks.Add(new DiagnosticCheck(
+                "直连地址",
+                addresses.Count > 0 ? "ok" : "warn",
+                addresses.Count > 0
+                    ? string.Join(" · ", addresses.Select(ip => $"http://{ip}:8080"))
+                    : "没有可用的内网地址"));
+        }
+        catch (Exception ex)
+        {
+            checks.Add(new DiagnosticCheck("直连地址", "warn", ex.Message));
         }
 
         // AI
