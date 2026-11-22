@@ -31,6 +31,12 @@
     var hasBackground = ThemeService.HasBackground && authed && isAdmin;
     var effects = theme == "inner" && themeSettings.Effects;
     var bgStyle = hasBackground ? $"--bg-image:url('/theme/background?v={ThemeService.BackgroundVersion}')" : string.Empty;
+
+    // 之前用内网地址直连过、这次是从隧道进来的 → 给个「试试直连」的按钮，不自动跳
+    var directOrigin = Genkan.Network.DirectLinkMiddleware.IsTunnel(Context.Request)
+        ? Genkan.Network.DirectLinkMiddleware.ReadOrigin(Context.Request)
+        : null;
+    var directUrl = directOrigin is null ? null : directOrigin + Context.Request.Path + Context.Request.QueryString;
 }
 <!doctype html>
 <html lang="zh-CN" data-theme="@theme" data-fx="@(effects ? "on" : "off")" data-font="@themeSettings.Font" data-bg="@(themeSettings.InsetBackground ? "inset" : "full")">
@@ -43,6 +49,14 @@
     @await RenderSectionAsync("Head", required: false)
 </head>
 <body class="app @(hasBackground ? "has-bg" : "")" data-role="@role" style="@bgStyle">
+    @if (directUrl is not null)
+    {
+        <div class="direct-hint">
+            <span>这次走的是隧道。你之前直连访问过，切到内网地址会快很多。</span>
+            <a class="direct-hint-go" href="@directUrl">试试直连</a>
+            <a class="direct-hint-skip" href="/direct/forget?returnUrl=@Uri.EscapeDataString(here)">忽略</a>
+        </div>
+    }
     <header class="mtop">
         <a class="mtop-brand" href="/">
             <img src="/assets/logo.svg" alt="" width="22" height="22" />
@@ -152,19 +166,63 @@
                 <span class="glyph">@item.Glyph</span><span>@item.Label</span>
             </a>
         }
-        @if (authed)
-        {
-            <a class="mbottom-link @Active("/me")" href="/me">
-                <span class="glyph">☺</span><span>我的</span>
-            </a>
-        }
-        else
-        {
-            <a class="mbottom-link @Active("/login")" href="/login">
-                <span class="glyph">→</span><span>登录</span>
-            </a>
-        }
+        <button class="mbottom-link" type="button" id="more-toggle" aria-haspopup="true" aria-expanded="false">
+            <span class="glyph">⋯</span><span>更多</span>
+        </button>
     </nav>
+
+    <div class="mdrawer" id="mdrawer" hidden>
+        <div class="mdrawer-backdrop" id="mdrawer-backdrop"></div>
+        <div class="mdrawer-panel" role="dialog" aria-label="更多页面">
+            <div class="mdrawer-head">
+                <span>更多</span>
+                <button class="link" type="button" id="more-close">关闭</button>
+            </div>
+
+            <div class="mdrawer-grid">
+                @if (authed)
+                {
+                    <a href="/dashboard">仪表盘</a>
+                    <a href="/sync">同步</a>
+                    <a href="/console">命令提示</a>
+                    <a href="/gallery">图墙</a>
+                    <a href="/notes">笔记</a>
+                    <a href="/clip">剪贴板</a>
+                }
+                @if (isAdmin)
+                {
+                    <a href="/admin/routes">路由管理</a>
+                    <a href="/admin/users">账号管理</a>
+                    <a href="/steward">代理站长</a>
+                    <a href="/backup">备份</a>
+                    <a href="/diagnostics">自诊断</a>
+                }
+                <a href="/about">关于</a>
+                @if (authed)
+                {
+                    <a href="/me">我的</a>
+                }
+                else
+                {
+                    <a href="/login">登录</a>
+                }
+            </div>
+
+            <div class="mdrawer-foot">
+                <div class="theme-switch" title="表 / 里 / 中性">
+                    <a class="@(theme == "surface" ? "on" : "")" href="/theme?name=surface&returnUrl=@encodedHere">表</a>
+                    <a class="@(theme == "inner" ? "on" : "")" href="/theme?name=inner&returnUrl=@encodedHere">里</a>
+                    <a class="@(theme == "neutral" ? "on" : "")" href="/theme?name=neutral&returnUrl=@encodedHere">中</a>
+                </div>
+                @if (authed)
+                {
+                    <form method="post" asp-page="/Logout">
+                        <button class="link" type="submit">退出登录</button>
+                    </form>
+                }
+            </div>
+        </div>
+    </div>
 
     <script src="/assets/js/app.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)

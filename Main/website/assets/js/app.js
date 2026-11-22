@@ -22,3 +22,34 @@
     });
   });
 })();
+
+/* 手机「更多」抽屉 */
+(function () {
+  'use strict';
+
+  const toggle = document.getElementById('more-toggle');
+  const drawer = document.getElementById('mdrawer');
+  const backdrop = document.getElementById('mdrawer-backdrop');
+  const close = document.getElementById('more-close');
+  if (!toggle || !drawer) return;
+
+  function open() {
+    drawer.hidden = false;
+    toggle.setAttribute('aria-expanded', 'true');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function hide() {
+    drawer.hidden = true;
+    toggle.setAttribute('aria-expanded', 'false');
+    document.body.style.overflow = '';
+  }
+
+  toggle.addEventListener('click', () => (drawer.hidden ? open() : hide()));
+  if (backdrop) backdrop.addEventListener('click', hide);
+  if (close) close.addEventListener('click', hide);
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !drawer.hidden) hide();
+  });
+})();

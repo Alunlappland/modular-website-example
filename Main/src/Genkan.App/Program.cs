@@ -925,6 +925,17 @@ app.MapPost("/api/blog/{slug}/annotations/{id:long}/moderate", async (
 });
 
 // 背景图是私人内容：只有站长登录后才拿得到，且禁止 CDN/浏览器缓存
+// 「忽略直连提示」：清掉记住的地址，回到当前页
+app.MapGet("/direct/forget", (HttpContext context, string? returnUrl) =>
+    {
+        context.Response.Cookies.Delete(DirectLinkMiddleware.OriginCookie);
+        var target = string.IsNullOrWhiteSpace(returnUrl) || !returnUrl.StartsWith('/') || returnUrl.StartsWith("//")
+            ? "/"
+            : returnUrl;
+        return Results.Redirect(target);
+    })
+    .AllowAnonymous();
+
 app.MapGet("/theme/background", (HttpContext context, ThemeService theme) =>
     {
         if (!context.User.IsInRole("admin"))
