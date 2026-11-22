@@ -7,7 +7,7 @@
 
 <section class="gallery-page" id="gallery"
          data-tags="@Model.Tags" data-provider="@Model.Provider"
-         data-source="@Model.Source" data-view="@Model.View">
+         data-source="@Model.Source" data-view="@Model.View" data-collection="@Model.Collection">
     <header class="gallery-head">
         <div>
             <p class="eyebrow">GALLERY</p>
@@ -31,6 +31,8 @@
         <a class="chip @(Model.View == "all" ? "on" : "")" href="/gallery?source=@Model.Source&tags=@Uri.EscapeDataString(Model.Tags)">全部</a>
         <a class="chip @(Model.View == "favorites" ? "on" : "")" href="/gallery?source=@Model.Source&view=favorites">♥ 收藏</a>
     </div>
+
+    <div class="gallery-collections" id="gallery-collections" hidden></div>
 
     <div class="gallery-blocked" id="gallery-blocked" hidden>
         <span class="muted small">已屏蔽：</span>

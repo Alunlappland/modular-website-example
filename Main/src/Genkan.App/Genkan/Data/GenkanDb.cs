@@ -43,6 +43,32 @@ public sealed class GenkanDb
         using var command = connection.CreateCommand();
         command.CommandText = Schema;
         command.ExecuteNonQuery();
+
+        // 轻量迁移：给老库补列（SQLite 不支持 ADD COLUMN IF NOT EXISTS）
+        var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        using (var info = connection.CreateCommand())
+        {
+            info.CommandText = "PRAGMA table_info(gallery_favorites)";
+            using var reader = info.ExecuteReader();
+            while (reader.Read())
+            {
+                columns.Add(reader.GetString(1));
+            }
+        }
+
+        if (!columns.Contains("collection_id"))
+        {
+            using var alter = connection.CreateCommand();
+            alter.CommandText = "ALTER TABLE gallery_favorites ADD COLUMN collection_id TEXT";
+            alter.ExecuteNonQuery();
+        }
+
+        if (!columns.Contains("local_path"))
+        {
+            using var alter = connection.CreateCommand();
+            alter.CommandText = "ALTER TABLE gallery_favorites ADD COLUMN local_path TEXT";
+            alter.ExecuteNonQuery();
+        }
     }
 
     private const string Schema = """
@@ -189,6 +215,15 @@ public sealed class GenkanDb
         );
 
         CREATE UNIQUE INDEX IF NOT EXISTS ux_gallery_blocked ON gallery_blocked_tags(owner, tag);
+
+        CREATE TABLE IF NOT EXISTS gallery_collections (
+            id         TEXT PRIMARY KEY,
+            owner      TEXT NOT NULL,
+            name       TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS ix_gallery_collections ON gallery_collections(owner, created_at);
 
         CREATE TABLE IF NOT EXISTS gallery_tag_history (
             id         TEXT PRIMARY KEY,

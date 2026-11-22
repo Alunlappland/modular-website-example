@@ -28,10 +28,13 @@ public sealed class GalleryService
     private readonly ILogger<GalleryService> _logger;
     private readonly ConcurrentDictionary<string, (DateTimeOffset At, IReadOnlyList<GalleryImage> Items)> _cache = new();
 
-    public GalleryService(IHttpClientFactory http, IConfiguration config, ILogger<GalleryService> logger)
+    private readonly GenkanPaths _paths;
+
+    public GalleryService(IHttpClientFactory http, IConfiguration config, GenkanPaths paths, ILogger<GalleryService> logger)
     {
         _http = http;
         _config = config;
+        _paths = paths;
         _logger = logger;
     }
 
@@ -288,6 +291,53 @@ public sealed class GalleryService
             _logger.LogWarning(ex, "拉取 safebooru 失败");
             return Array.Empty<GalleryImage>();
         }
+    }
+
+    /// <summary>收藏时把原图抓到服务器存一份，源站删图也不怕。返回相对路径。</summary>
+    public async Task<string?> SaveLocalCopyAsync(string owner, string key, string url, CancellationToken cancellationToken)
+    {
+        var fetched = await ProxyImageAsync(url, cancellationToken);
+        if (fetched is null)
+        {
+            return null;
+        }
+
+        var safeOwner = new string(owner.Where(char.IsLetterOrDigit).ToArray());
+        if (safeOwner.Length == 0)
+        {
+            safeOwner = "unknown";
+        }
+
+        var directory = Path.Combine(_paths.Data, "gallery", safeOwner);
+        Directory.CreateDirectory(directory);
+
+        var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(key)))[..24].ToLowerInvariant();
+
+        var extension = fetched.Value.ContentType switch
+        {
+            "image/png" => ".png",
+            "image/webp" => ".webp",
+            "image/gif" => ".gif",
+            _ => ".jpg",
+        };
+
+        var file = Path.Combine(directory, hash + extension);
+        await File.WriteAllBytesAsync(file, fetched.Value.Bytes, cancellationToken);
+
+        return Path.GetRelativePath(_paths.Data, file).Replace('\\', '/');
+    }
+
+    public string? LocalAbsolutePath(string? relative)
+    {
+        if (string.IsNullOrWhiteSpace(relative))
+        {
+            return null;
+        }
+
+        var full = Path.GetFullPath(Path.Combine(_paths.Data, relative));
+        var root = Path.GetFullPath(_paths.Data) + Path.DirectorySeparatorChar;
+        return full.StartsWith(root, StringComparison.OrdinalIgnoreCase) && File.Exists(full) ? full : null;
     }
 
     /// <summary>只转发白名单主机的图片，防止被当成任意代理。</summary>

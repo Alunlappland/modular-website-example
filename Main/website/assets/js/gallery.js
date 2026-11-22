@@ -19,6 +19,7 @@
   const tags = page.dataset.tags || '';
   const source = page.dataset.source || '';
   const view = page.dataset.view || 'all';
+  let activeCollection = page.dataset.collection || '';
 
   const state = {
     blocked: new Set(),
@@ -129,6 +130,7 @@
             originalUrl: item.originalUrl,
             source: item.source,
             tags: item.tags,
+            collectionId: view === 'favorites' && activeCollection && activeCollection !== 'none' ? activeCollection : null,
           }),
         });
         state.favorites.add(key);
@@ -265,7 +267,7 @@
 
     try {
       const url = view === 'favorites'
-        ? '/api/gallery/favorites'
+        ? '/api/gallery/favorites?collection=' + encodeURIComponent(activeCollection)
         : '/api/gallery?page=' + state.page +
           '&tags=' + encodeURIComponent(tags) +
           '&source=' + encodeURIComponent(source);
@@ -339,8 +341,84 @@
     if (state.current) toggleFavorite(state.current, null);
   });
 
+  async function loadCollections() {
+    const box = document.getElementById('gallery-collections');
+    if (!box) return;
+
+    if (view !== 'favorites') {
+      box.hidden = true;
+      return;
+    }
+
+    box.hidden = false;
+    box.textContent = '';
+
+    try {
+      const response = await fetch('/api/gallery/collections', { headers: { Accept: 'application/json' } });
+      const collections = response.ok ? await response.json() : [];
+
+      const all = document.createElement('a');
+      all.className = 'chip' + (activeCollection === '' ? ' on' : '');
+      all.href = '/gallery?view=favorites';
+      all.textContent = '全部';
+      box.appendChild(all);
+
+      const none = document.createElement('a');
+      none.className = 'chip' + (activeCollection === 'none' ? ' on' : '');
+      none.href = '/gallery?view=favorites&collection=none';
+      none.textContent = '未分类';
+      box.appendChild(none);
+
+      collections.forEach((collection) => {
+        const chip = document.createElement('a');
+        chip.className = 'chip' + (activeCollection === collection.id ? ' on' : '');
+        chip.href = '/gallery?view=favorites&collection=' + encodeURIComponent(collection.id);
+        chip.textContent = collection.name + '（' + collection.count + '）';
+        box.appendChild(chip);
+
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'chip gallery-collection-del';
+        remove.textContent = '×';
+        remove.title = '删除收藏夹（里面的图会回到未分类）';
+        remove.addEventListener('click', async () => {
+          if (!window.confirm('删除收藏夹「' + collection.name + '」？图片会回到「未分类」。')) return;
+          await fetch('/api/gallery/collections?id=' + encodeURIComponent(collection.id), { method: 'DELETE' });
+          window.location.href = '/gallery?view=favorites';
+        });
+        box.appendChild(remove);
+      });
+
+      const create = document.createElement('button');
+      create.type = 'button';
+      create.className = 'chip gallery-collection-new';
+      create.textContent = '＋ 新建收藏夹';
+      create.addEventListener('click', async () => {
+        const name = window.prompt('收藏夹名字（比如：壁纸、老婆、夜景）');
+        if (!name) return;
+
+        const response2 = await fetch('/api/gallery/collections', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name }),
+        });
+
+        if (response2.ok) {
+          const data = await response2.json();
+          window.location.href = '/gallery?view=favorites&collection=' + encodeURIComponent(data.id);
+        } else {
+          window.alert('创建失败。');
+        }
+      });
+      box.appendChild(create);
+    } catch (error) {
+      box.textContent = '收藏夹加载失败：' + error.message;
+    }
+  }
+
   (async () => {
     await loadPrefs();
+    await loadCollections();
     rebuildColumns();
     await loadMore();
   })();

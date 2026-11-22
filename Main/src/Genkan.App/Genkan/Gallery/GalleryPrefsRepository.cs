@@ -12,7 +12,17 @@ public sealed class FavoriteRow
     public string OriginalUrl { get; set; } = string.Empty;
     public string Source { get; set; } = string.Empty;
     public string? Tags { get; set; }
+    public string? CollectionId { get; set; }
+    public string? LocalPath { get; set; }
     public string CreatedAt { get; set; } = string.Empty;
+}
+
+public sealed class CollectionRow
+{
+    public string Id { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string CreatedAt { get; set; } = string.Empty;
+    public int Count { get; set; }
 }
 
 public sealed class BlockedTagRow
@@ -35,12 +45,72 @@ public sealed class GalleryPrefsRepository
 
     public GalleryPrefsRepository(GenkanDb db) => _db = db;
 
-    public IReadOnlyList<FavoriteRow> Favorites(string owner)
+    public IReadOnlyList<FavoriteRow> Favorites(string owner, string? collectionId = null)
     {
         using var connection = _db.Open();
+
+        if (string.IsNullOrWhiteSpace(collectionId))
+        {
+            return connection.Query<FavoriteRow>(
+                "SELECT * FROM gallery_favorites WHERE owner = @owner ORDER BY created_at DESC",
+                new { owner }).ToList();
+        }
+
+        if (collectionId == "none")
+        {
+            return connection.Query<FavoriteRow>(
+                "SELECT * FROM gallery_favorites WHERE owner = @owner AND collection_id IS NULL ORDER BY created_at DESC",
+                new { owner }).ToList();
+        }
+
         return connection.Query<FavoriteRow>(
-            "SELECT * FROM gallery_favorites WHERE owner = @owner ORDER BY created_at DESC",
+            "SELECT * FROM gallery_favorites WHERE owner = @owner AND collection_id = @collectionId ORDER BY created_at DESC",
+            new { owner, collectionId }).ToList();
+    }
+
+    public FavoriteRow? FindFavorite(string owner, string imageKey)
+    {
+        using var connection = _db.Open();
+        return connection.QuerySingleOrDefault<FavoriteRow>(
+            "SELECT * FROM gallery_favorites WHERE owner = @owner AND image_key = @imageKey",
+            new { owner, imageKey });
+    }
+
+    public IReadOnlyList<CollectionRow> Collections(string owner)
+    {
+        using var connection = _db.Open();
+        return connection.Query<CollectionRow>(
+            """
+            SELECT c.id, c.name, c.created_at,
+                   (SELECT COUNT(*) FROM gallery_favorites f WHERE f.owner = c.owner AND f.collection_id = c.id) AS count
+            FROM gallery_collections c
+            WHERE c.owner = @owner
+            ORDER BY c.created_at
+            """,
             new { owner }).ToList();
+    }
+
+    public string CreateCollection(string owner, string name)
+    {
+        var id = Guid.NewGuid().ToString("N");
+        using var connection = _db.Open();
+        connection.Execute(
+            "INSERT INTO gallery_collections(id, owner, name, created_at) VALUES (@id, @owner, @name, @createdAt)",
+            new { id, owner, name, createdAt = DateTimeOffset.UtcNow.ToString("O") });
+
+        return id;
+    }
+
+    public bool DeleteCollection(string owner, string id)
+    {
+        using var connection = _db.Open();
+        connection.Execute(
+            "UPDATE gallery_favorites SET collection_id = NULL WHERE owner = @owner AND collection_id = @id",
+            new { owner, id });
+
+        return connection.Execute(
+            "DELETE FROM gallery_collections WHERE owner = @owner AND id = @id",
+            new { owner, id }) > 0;
     }
 
     public bool AddFavorite(string owner, FavoriteRow row)
@@ -48,8 +118,8 @@ public sealed class GalleryPrefsRepository
         using var connection = _db.Open();
         return connection.Execute(
             """
-            INSERT INTO gallery_favorites(id, owner, image_key, preview_url, original_url, source, tags, created_at)
-            VALUES (@id, @owner, @imageKey, @previewUrl, @originalUrl, @source, @tags, @createdAt)
+            INSERT INTO gallery_favorites(id, owner, image_key, preview_url, original_url, source, tags, collection_id, local_path, created_at)
+            VALUES (@id, @owner, @imageKey, @previewUrl, @originalUrl, @source, @tags, @collectionId, @localPath, @createdAt)
             ON CONFLICT(owner, image_key) DO NOTHING
             """,
             new
@@ -61,8 +131,18 @@ public sealed class GalleryPrefsRepository
                 originalUrl = row.OriginalUrl,
                 source = row.Source,
                 tags = row.Tags,
+                collectionId = string.IsNullOrWhiteSpace(row.CollectionId) ? null : row.CollectionId,
+                localPath = string.IsNullOrWhiteSpace(row.LocalPath) ? null : row.LocalPath,
                 createdAt = DateTimeOffset.UtcNow.ToString("O"),
             }) > 0;
+    }
+
+    public void SetLocalPath(string owner, string imageKey, string localPath)
+    {
+        using var connection = _db.Open();
+        connection.Execute(
+            "UPDATE gallery_favorites SET local_path = @localPath WHERE owner = @owner AND image_key = @imageKey",
+            new { owner, imageKey, localPath });
     }
 
     public bool RemoveFavorite(string owner, string imageKey)

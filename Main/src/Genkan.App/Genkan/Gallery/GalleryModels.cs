@@ -1,4 +1,4 @@
-﻿namespace Genkan.Gallery;
+namespace Genkan.Gallery;
 
 public sealed record GalleryFavoriteRequest(
     string? Id,
@@ -6,8 +6,11 @@ public sealed record GalleryFavoriteRequest(
     string? PreviewUrl,
     string? OriginalUrl,
     string? Source,
-    string? Tags);
+    string? Tags,
+    string? CollectionId);
 
 public sealed record GalleryTagRequest(string? Tag);
 
 public sealed record GalleryHistoryRequest(string? Query, string? Source);
+
+public sealed record GalleryCollectionRequest(string? Name);

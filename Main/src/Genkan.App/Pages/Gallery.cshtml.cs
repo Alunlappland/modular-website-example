@@ -25,6 +25,8 @@ public class GalleryModel : PageModel
 
     public string View { get; private set; } = "all";
 
+    public string? Collection { get; private set; }
+
     public string ProviderLabel => Source == "local" ? "本地" : Source;
 
     public IReadOnlyList<(string Id, string Label)> Sources { get; } = new[]
@@ -35,7 +37,7 @@ public class GalleryModel : PageModel
         ("local", "本地（我上传的）"),
     };
 
-    public void OnGet(string? tags, string? source, string? view)
+    public void OnGet(string? tags, string? source, string? view, string? collection)
     {
         Provider = _gallery.Provider;
         Source = string.IsNullOrWhiteSpace(source) ? Provider : source.Trim().ToLowerInvariant();
@@ -45,6 +47,7 @@ public class GalleryModel : PageModel
         }
 
         View = string.Equals(view, "favorites", StringComparison.OrdinalIgnoreCase) ? "favorites" : "all";
+        Collection = string.IsNullOrWhiteSpace(collection) ? null : collection.Trim();
         Tags = string.IsNullOrWhiteSpace(tags) ? _gallery.DefaultTags : tags.Trim();
 
         // 只记用户主动搜过的标签，避免翻页也写历史

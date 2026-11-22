@@ -551,10 +551,53 @@ app.MapPost("/api/gallery/favorite", (GalleryFavoriteRequest request, HttpContex
     })
     .RequireAuthorization();
 
+app.MapGet("/api/gallery/favorite/image", (string key, HttpContext context, GalleryPrefsRepository prefs, GalleryService gallery) =>
+    {
+        var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        var row = prefs.FindFavorite(owner, key);
+        var path = row is null ? null : gallery.LocalAbsolutePath(row.LocalPath);
+        if (path is null)
+        {
+            return Results.NotFound();
+        }
+
+        context.Response.Headers.CacheControl = "private, max-age=86400";
+        return Results.File(path, "image/jpeg");
+    })
+    .RequireAuthorization();
+
 app.MapDelete("/api/gallery/favorite", (string key, HttpContext context, GalleryPrefsRepository prefs) =>
     {
         var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
         return Results.Ok(new { ok = prefs.RemoveFavorite(owner, key) });
+    })
+    .RequireAuthorization();
+
+app.MapGet("/api/gallery/collections", (HttpContext context, GalleryPrefsRepository prefs) =>
+    {
+        var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        return Results.Ok(prefs.Collections(owner).Select(row => new { id = row.Id, name = row.Name, count = row.Count }));
+    })
+    .RequireAuthorization();
+
+app.MapPost("/api/gallery/collections", (GalleryCollectionRequest request, HttpContext context, GalleryPrefsRepository prefs) =>
+    {
+        var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        var name = (request.Name ?? string.Empty).Trim();
+        if (name.Length is < 1 or > 32)
+        {
+            return Results.BadRequest(new { error = "收藏夹名字 1–32 个字。" });
+        }
+
+        var id = prefs.CreateCollection(owner, name);
+        return Results.Ok(new { ok = true, id, name });
+    })
+    .RequireAuthorization();
+
+app.MapDelete("/api/gallery/collections", (string id, HttpContext context, GalleryPrefsRepository prefs) =>
+    {
+        var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        return Results.Ok(new { ok = prefs.DeleteCollection(owner, id) });
     })
     .RequireAuthorization();
 
