@@ -170,3 +170,150 @@
     render();
   }
 })();
+
+/* 文章内搜索：Ctrl+F 打开页面搜索条，高亮所有命中并可跳转 */
+(function () {
+  'use strict';
+
+  const body = document.querySelector('.post-body');
+  if (!body) return;
+
+  let originalHtml = null;
+  let marks = [];
+  let current = -1;
+
+  const bar = document.createElement('div');
+  bar.className = 'post-search';
+  bar.hidden = true;
+  bar.innerHTML =
+    '<input type="search" id="post-search-input" placeholder="在本文中查找…" autocomplete="off" />' +
+    '<span class="post-search-count" id="post-search-count"></span>' +
+    '<button type="button" class="link" id="post-search-prev">上一个</button>' +
+    '<button type="button" class="link" id="post-search-next">下一个</button>' +
+    '<button type="button" class="link" id="post-search-close">关闭</button>';
+  document.body.appendChild(bar);
+
+  const input = bar.querySelector('#post-search-input');
+  const count = bar.querySelector('#post-search-count');
+
+  function clearHighlights() {
+    if (originalHtml !== null) {
+      body.innerHTML = originalHtml;
+    }
+    marks = [];
+    current = -1;
+    if (count) count.textContent = '';
+  }
+
+  function close() {
+    clearHighlights();
+    bar.hidden = true;
+    originalHtml = null;
+  }
+
+  function highlight(query) {
+    if (originalHtml === null) {
+      originalHtml = body.innerHTML;
+    } else {
+      body.innerHTML = originalHtml;
+    }
+
+    marks = [];
+    current = -1;
+
+    const trimmed = query.trim();
+    if (!trimmed) {
+      if (count) count.textContent = '';
+      return;
+    }
+
+    const lower = trimmed.toLowerCase();
+    const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+        if (node.parentElement && node.parentElement.closest('script,style')) return NodeFilter.FILTER_REJECT;
+        return node.nodeValue.toLowerCase().includes(lower) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+      },
+    });
+
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+
+    nodes.forEach((node) => {
+      const text = node.nodeValue;
+      const source = text.toLowerCase();
+      const fragment = document.createDocumentFragment();
+      let index = 0;
+      let found = source.indexOf(lower, index);
+
+      while (found >= 0) {
+        if (found > index) fragment.appendChild(document.createTextNode(text.slice(index, found)));
+        const mark = document.createElement('mark');
+        mark.className = 'post-search-hit';
+        mark.textContent = text.slice(found, found + trimmed.length);
+        fragment.appendChild(mark);
+        marks.push(mark);
+        index = found + trimmed.length;
+        found = source.indexOf(lower, index);
+      }
+
+      if (index < text.length) fragment.appendChild(document.createTextNode(text.slice(index)));
+
+      const parent = node.parentNode;
+      if (parent) parent.replaceChild(fragment, node);
+    });
+
+    if (count) count.textContent = marks.length ? '1 / ' + marks.length : '没有找到';
+
+    if (marks.length) {
+      current = 0;
+      marks[0].classList.add('current');
+      marks[0].scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+  }
+
+  function step(delta) {
+    if (!marks.length) return;
+    marks[current].classList.remove('current');
+    current = (current + delta + marks.length) % marks.length;
+    marks[current].classList.add('current');
+    marks[current].scrollIntoView({ block: 'center', behavior: 'smooth' });
+    if (count) count.textContent = (current + 1) + ' / ' + marks.length;
+  }
+
+  function open() {
+    bar.hidden = false;
+    input.focus();
+    input.select();
+    if (input.value) highlight(input.value);
+  }
+
+  document.addEventListener('keydown', function (event) {
+    const isFind = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f';
+    if (isFind) {
+      event.preventDefault();
+      open();
+      return;
+    }
+
+    if (bar.hidden) return;
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      close();
+    } else if (event.key === 'Enter' && document.activeElement === input) {
+      event.preventDefault();
+      step(event.shiftKey ? -1 : 1);
+    }
+  });
+
+  let timer = null;
+  input.addEventListener('input', function () {
+    clearTimeout(timer);
+    timer = setTimeout(() => highlight(input.value), 120);
+  });
+
+  bar.querySelector('#post-search-next').addEventListener('click', () => step(1));
+  bar.querySelector('#post-search-prev').addEventListener('click', () => step(-1));
+  bar.querySelector('#post-search-close').addEventListener('click', close);
+})();

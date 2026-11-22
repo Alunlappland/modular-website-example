@@ -271,3 +271,36 @@
   .blog-head-right { text-align: left; }
   .anno-pop { right: 12px; left: 12px; width: auto; }
 }
+
+/* ÎÄÕÂÄÚËÑË÷ */
+.post-search {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--card-solid);
+  box-shadow: 0 18px 40px -24px rgba(0, 0, 0, 0.45);
+}
+.post-search input {
+  width: 200px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 13px;
+}
+.post-search-count { font-size: 12px; color: var(--ink-soft); }
+mark.post-search-hit { background: color-mix(in srgb, #f2c94c 55%, transparent); color: inherit; padding: 0 1px; border-radius: 2px; }
+mark.post-search-hit.current { background: var(--accent); color: #fff; }
+
+@media (max-width: 720px) {
+  .post-search { left: 10px; right: 10px; top: auto; bottom: 12px; flex-wrap: wrap; }
+  .post-search input { flex: 1; width: auto; }
+}

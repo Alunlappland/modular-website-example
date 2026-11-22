@@ -7,9 +7,11 @@ using Genkan;
 using Genkan.Ai;
 using Genkan.Backup;
 using Genkan.Blog;
+using Genkan.Clip;
 using Genkan.Console;
 using Genkan.Data;
 using Genkan.Files;
+using Genkan.Notes;
 using Genkan.Security;
 using Genkan.Sync;
 using Genkan.Theme;
@@ -122,6 +124,10 @@ builder.Services.AddSingleton<ThemeService>();
 
 // 自诊断
 builder.Services.AddSingleton<DiagnosticsService>();
+
+// 剪贴板与笔记
+builder.Services.AddSingleton<ClipRepository>();
+builder.Services.AddSingleton<NotesService>();
 builder.Services.AddHttpClient("moderation", client => client.Timeout = TimeSpan.FromSeconds(8));
 builder.Services.AddSingleton<SetupState>();
 

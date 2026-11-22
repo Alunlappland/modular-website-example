@@ -159,6 +159,15 @@ public sealed class GenkanDb
 
         CREATE INDEX IF NOT EXISTS ix_backup_started ON backup_runs(started_at);
 
+        CREATE TABLE IF NOT EXISTS clips (
+            id          TEXT PRIMARY KEY,
+            owner       TEXT NOT NULL,
+            text        TEXT NOT NULL,
+            created_at  TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS ix_clips_owner ON clips(owner, created_at);
+
         INSERT INTO settings(key, value, updated_at)
         VALUES ('schema_version', '1', datetime('now'))
         ON CONFLICT(key) DO NOTHING;

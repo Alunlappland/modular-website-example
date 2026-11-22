@@ -1,0 +1,75 @@
+@page "/clip"
+@model Genkan.Pages.ClipModel
+@{
+    ViewData["Title"] = "剪贴板";
+}
+
+<section class="panel">
+    <p class="eyebrow">CLIPBOARD</p>
+    <h1>剪贴板</h1>
+    <p class="muted">
+        把一段文字存到服务器，手机上复制，电脑上再点一下——不用再给自己发消息。
+    </p>
+
+    @if (!string.IsNullOrEmpty(Model.Message))
+    {
+        <div class="notice">@Model.Message</div>
+    }
+    @if (!string.IsNullOrEmpty(Model.Error))
+    {
+        <div class="alert">@Model.Error</div>
+    }
+
+    <form method="post" asp-page-handler="Add">
+        <label class="field">
+            <span>要存下来的文字</span>
+            <textarea asp-for="Text" rows="5" placeholder="链接、命令、一段话……"></textarea>
+        </label>
+        <button class="btn" type="submit">存进剪贴板</button>
+    </form>
+</section>
+
+<section class="panel" style="margin-top:16px">
+    <div class="panel-head"><span>已保存（@Model.Items.Count）</span></div>
+
+    @if (Model.Items.Count == 0)
+    {
+        <p class="muted">还是空的。</p>
+    }
+    else
+    {
+        <ul class="clip-list">
+            @foreach (var item in Model.Items)
+            {
+                <li class="clip-item">
+                    <pre class="clip-text">@item.Text</pre>
+                    <div class="clip-actions">
+                        <button class="link" type="button" data-copy="@item.Id">复制</button>
+                        <form method="post" asp-page-handler="Delete" onsubmit="return confirm('删除这条？');">
+                            <input type="hidden" name="id" value="@item.Id" />
+                            <button class="link danger" type="submit">删除</button>
+                        </form>
+                    </div>
+                </li>
+            }
+        </ul>
+    }
+</section>
+
+<script>
+    (function () {
+        document.querySelectorAll('[data-copy]').forEach(function (button) {
+            button.addEventListener('click', async function () {
+                const item = button.closest('.clip-item');
+                const text = item ? item.querySelector('.clip-text').textContent : '';
+                try {
+                    await navigator.clipboard.writeText(text);
+                    button.textContent = '已复制';
+                    setTimeout(function () { button.textContent = '复制'; }, 1400);
+                } catch (error) {
+                    window.prompt('手动复制：', text);
+                }
+            });
+        });
+    })();
+</script>

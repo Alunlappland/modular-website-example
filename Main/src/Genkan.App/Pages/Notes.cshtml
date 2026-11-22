@@ -1,0 +1,91 @@
+@page "/notes"
+@model Genkan.Pages.NotesModel
+@{
+    ViewData["Title"] = "笔记";
+}
+<link rel="stylesheet" href="/assets/css/blog.css" asp-append-version="true" />
+
+@if (!string.IsNullOrEmpty(Model.Message))
+{
+    <div class="notice">@Model.Message</div>
+}
+@if (!string.IsNullOrEmpty(Model.Error))
+{
+    <div class="alert">@Model.Error</div>
+}
+
+@if (Model.CurrentName is not null)
+{
+    <section class="post">
+        <a class="back" href="/notes">← 所有笔记</a>
+        <div class="post-body">
+            @foreach (var block in Model.Blocks)
+            {
+                <section class="md-block">
+                    <div class="md-content">@Html.Raw(block.Html)</div>
+                </section>
+            }
+        </div>
+        <div class="row">
+            <a class="btn ghost" href="/notes?edit=@Uri.EscapeDataString(Model.CurrentName)">编辑</a>
+            <form method="post" asp-page-handler="Delete" onsubmit="return confirm('删除这篇笔记？');">
+                <input type="hidden" name="file" value="@Model.CurrentName" />
+                <button class="btn ghost" type="submit">删除</button>
+            </form>
+        </div>
+    </section>
+}
+
+<section class="panel" style="margin-top:16px">
+    <div class="panel-head">
+        <span>@(Model.CurrentName is null && Model.Content is not null ? "编辑笔记" : "写一篇")</span>
+        <span class="muted small">存在服务器 Main\document\notes\*.md</span>
+    </div>
+
+    <form method="post" asp-page-handler="Save">
+        <label class="field">
+            <span>标题（会成为文件名）</span>
+            <input asp-for="Name" placeholder="比如 待读清单" />
+        </label>
+        <label class="field">
+            <span>内容（Markdown）</span>
+            <textarea asp-for="Content" rows="9" placeholder="# 标题&#10;&#10;随便写点什么"></textarea>
+        </label>
+        <button class="btn" type="submit">保存</button>
+    </form>
+
+    <form method="post" asp-page-handler="Upload" enctype="multipart/form-data" style="margin-top:14px">
+        <label class="field">
+            <span>或者导入已有的 .md 文件（≤ 2MB）</span>
+            <input asp-for="Upload" type="file" accept=".md,text/markdown" />
+        </label>
+        <button class="btn ghost" type="submit">导入</button>
+    </form>
+</section>
+
+<section class="panel" style="margin-top:16px">
+    <div class="panel-head"><span>全部笔记（@Model.Notes.Count）</span></div>
+
+    @if (Model.Notes.Count == 0)
+    {
+        <p class="muted">还没有笔记。</p>
+    }
+    else
+    {
+        <table class="file-table">
+            <thead>
+                <tr><th>名称</th><th>大小</th><th>修改</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var note in Model.Notes)
+                {
+                    <tr>
+                        <td class="name"><a class="link" href="/notes?file=@Uri.EscapeDataString(note.Name)">@note.Name</a></td>
+                        <td>@((note.Size / 1024.0).ToString("F1")) KB</td>
+                        <td>@note.UpdatedAt</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</section>
