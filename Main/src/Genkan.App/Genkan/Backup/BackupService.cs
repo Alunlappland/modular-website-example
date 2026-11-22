@@ -88,7 +88,10 @@ public sealed class BackupService
                 return (false, error ?? "备份失败。");
             }
 
-            return (true, $"备份完成：{files ?? 0} 个文件，{FormatBytes(bytes ?? 0)}。");
+            var summary = files is null && bytes is null
+            ? "备份完成（kopia 未回传统计，可在快照列表里看大小）"
+            : $"备份完成：{files ?? 0} 个文件，{FormatBytes(bytes ?? 0)}。";
+        return (true, summary);
         }
         catch (Exception ex)
         {
