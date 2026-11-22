@@ -502,3 +502,5 @@ html[data-bg="full"] body.has-bg::before {
     border-radius: 14px;
   }
 }
+/* hidden 属性必须能压过组件自己的 display（灯箱/进度条/设置面板都依赖它） */
+[hidden] { display: none !important; }
