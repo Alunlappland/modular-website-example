@@ -12,37 +12,59 @@
         <div>
             <p class="eyebrow">GALLERY</p>
             <h1>图墙</h1>
-            <p class="muted small">只从 SFW 图源拉取（@Model.ProviderLabel · @Model.Tags）。往下滚会自动加载。</p>
+            @if (Model.View == "all")
+            {
+                <p class="muted small">只从 SFW 图源拉取（@Model.ProviderLabel）。往下滚会自动加载。</p>
+            }
+            else
+            {
+                <p class="muted small">收藏的图都会存一份到服务器，源站删了也能看。</p>
+            }
         </div>
         <form method="get" class="gallery-search">
+            <input type="hidden" name="view" value="@Model.View" />
             <input type="hidden" name="source" value="@Model.Source" />
-            <input name="tags" value="@Model.Tags" placeholder="标签，比如 landscape / 风景" autocomplete="off" />
-            <button class="btn" type="submit">换一批</button>
+            <input type="hidden" name="collection" value="@Model.Collection" />
+            <input name="tags" value="@(Model.View == "favorites" ? Model.Tags : Model.Tags)"
+                   placeholder="@(Model.View == "favorites" ? "在收藏里找标签…" : "标签，比如 landscape")"
+                   autocomplete="off" />
+            <button class="btn" type="submit">@(Model.View == "favorites" ? "过滤" : "换一批")</button>
         </form>
     </header>
 
-    <div class="gallery-sources">
-        @foreach (var source in Model.Sources)
-        {
-            <a class="chip @(Model.Source == source.Id ? "on" : "")"
-               href="/gallery?source=@source.Id&tags=@Uri.EscapeDataString(Model.Tags)">@source.Label</a>
-        }
-        <span class="gallery-split"></span>
-        <a class="chip @(Model.View == "all" ? "on" : "")" href="/gallery?source=@Model.Source&tags=@Uri.EscapeDataString(Model.Tags)">全部</a>
-        <a class="chip @(Model.View == "favorites" ? "on" : "")" href="/gallery?source=@Model.Source&view=favorites">♥ 收藏</a>
-    </div>
+    <nav class="gallery-modes" aria-label="图墙模式">
+        <a class="gallery-mode @(Model.View == "all" ? "on" : "")"
+           href="/gallery?source=@Model.Source&tags=@Uri.EscapeDataString(Model.Tags)">图源</a>
+        <a class="gallery-mode @(Model.View == "favorites" ? "on" : "")" href="/gallery?view=favorites">♥ 收藏</a>
+    </nav>
 
-    <div class="gallery-collections" id="gallery-collections" hidden></div>
+    @if (Model.View == "all")
+    {
+        <div class="gallery-sources">
+            @foreach (var source in Model.Sources)
+            {
+                <a class="chip @(Model.Source == source.Id ? "on" : "")"
+                   href="/gallery?source=@source.Id&tags=@Uri.EscapeDataString(Model.Tags)">@source.Label</a>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="gallery-collections" id="gallery-collections"></div>
+    }
 
     <div class="gallery-blocked" id="gallery-blocked" hidden>
         <span class="muted small">已屏蔽：</span>
         <span class="gallery-blocked-list" id="gallery-blocked-list"></span>
     </div>
 
-    <div class="gallery-history" id="gallery-history" hidden>
-        <span class="muted small">搜过：</span>
-        <span class="gallery-history-list" id="gallery-history-list"></span>
-    </div>
+    @if (Model.View == "all")
+    {
+        <div class="gallery-history" id="gallery-history" hidden>
+            <span class="muted small">搜过：</span>
+            <span class="gallery-history-list" id="gallery-history-list"></span>
+        </div>
+    }
 
     <div class="gallery-flow" id="gallery-flow"></div>
 

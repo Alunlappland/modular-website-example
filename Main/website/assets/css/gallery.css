@@ -83,3 +83,11 @@ body.gallery-locked { overflow: hidden; }
 .gallery-collections { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: -6px 0 12px; }
 .gallery-collection-del { padding: 4px 9px; color: var(--ink-soft); }
 .gallery-collection-new { border-style: dashed; }
+
+/* 模式切换：先图源/收藏，再在模式内分类 */
+.gallery-modes { display: flex; gap: 6px; margin-bottom: 12px; }
+.gallery-mode {
+  padding: 7px 18px; border-radius: 10px; font-size: 13.5px; text-decoration: none;
+  border: 1px solid var(--line); color: var(--ink-soft);
+}
+.gallery-mode.on { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); font-weight: 600; }

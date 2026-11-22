@@ -275,7 +275,14 @@
       const response = await fetch(url, { headers: { Accept: 'application/json' } });
       if (!response.ok) throw new Error('HTTP ' + response.status);
 
-      const items = await response.json();
+      let items = await response.json();
+
+      // 收藏模式：按标签做本地过滤
+      if (view === 'favorites' && tags) {
+        const needle = tags.toLowerCase();
+        items = (items || []).filter((item) => (item.tags || '').toLowerCase().includes(needle));
+      }
+
       if (!Array.isArray(items) || items.length === 0) {
         state.exhausted = true;
         if (status) {

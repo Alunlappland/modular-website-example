@@ -48,7 +48,10 @@ public class GalleryModel : PageModel
 
         View = string.Equals(view, "favorites", StringComparison.OrdinalIgnoreCase) ? "favorites" : "all";
         Collection = string.IsNullOrWhiteSpace(collection) ? null : collection.Trim();
-        Tags = string.IsNullOrWhiteSpace(tags) ? _gallery.DefaultTags : tags.Trim();
+        // 收藏模式默认不过滤；图源模式默认用配置里的 safe
+        Tags = string.IsNullOrWhiteSpace(tags)
+            ? (View == "favorites" ? string.Empty : _gallery.DefaultTags)
+            : tags.Trim();
 
         // 只记用户主动搜过的标签，避免翻页也写历史
         if (!string.IsNullOrWhiteSpace(tags) && View == "all")
