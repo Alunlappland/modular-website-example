@@ -35,7 +35,7 @@ public sealed class GalleryService
         _logger = logger;
     }
 
-    public string Provider => (_config["gallery:provider"] ?? "konachan").Trim().ToLowerInvariant();
+    public string Provider => (_config["gallery:provider"] ?? "safebooru").Trim().ToLowerInvariant();
 
     public string DefaultTags => (_config["gallery:tags"] ?? "safe").Trim();
 
@@ -57,7 +57,20 @@ public sealed class GalleryService
             ? await FetchSafebooruAsync(page, tagQuery, cancellationToken)
             : await FetchKonachanAsync(page, tagQuery, cancellationToken);
 
-        _cache[cacheKey] = (DateTimeOffset.UtcNow, items);
+        // 主源被墙/403 时自动试另一个
+        if (items.Count == 0)
+        {
+            _logger.LogInformation("主图源没有结果，尝试备用源");
+            items = Provider == "safebooru"
+                ? await FetchKonachanAsync(page, tagQuery, cancellationToken)
+                : await FetchSafebooruAsync(page, tagQuery, cancellationToken);
+        }
+
+        // 只缓存有内容的结果，失败下回还能重试
+        if (items.Count > 0)
+        {
+            _cache[cacheKey] = (DateTimeOffset.UtcNow, items);
+        }
 
         // 缓存别无限长
         if (_cache.Count > 300)
@@ -84,7 +97,10 @@ public sealed class GalleryService
 
         try
         {
-            using var response = await client.GetAsync(url, cancellationToken);
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Genkan/1.0");
+            request.Headers.Referrer = new Uri("https://konachan.net/");
+            using var response = await client.SendAsync(request, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogWarning("图源返回 {Status}", (int)response.StatusCode);
@@ -140,7 +156,10 @@ public sealed class GalleryService
 
         try
         {
-            using var response = await client.GetAsync(url, cancellationToken);
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Genkan/1.0");
+            request.Headers.Referrer = new Uri("https://konachan.net/");
+            using var response = await client.SendAsync(request, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 return Array.Empty<GalleryImage>();
@@ -157,12 +176,25 @@ public sealed class GalleryService
 
                 var directory = Str("directory");
                 var image = Str("image");
-                if (string.IsNullOrEmpty(directory) || string.IsNullOrEmpty(image)) continue;
 
-                var original = $"https://safebooru.org/images/{directory}/{image}";
-                var preview = $"https://safebooru.org/samples/{directory}/sample_{image}";
+                // safebooru 直接给了三种尺寸，优先用它的字段
+                var original = Str("file_url");
+                var preview = Str("sample_url");
+                if (string.IsNullOrEmpty(preview)) preview = original;
+                if (string.IsNullOrEmpty(original) && !string.IsNullOrEmpty(directory) && !string.IsNullOrEmpty(image))
+                {
+                    original = $"https://safebooru.org/images/{directory}/{image}";
+                    preview = original;
+                }
+
+                if (string.IsNullOrEmpty(preview) || string.IsNullOrEmpty(original))
+                {
+                    continue;
+                }
+
                 if (preview.EndsWith(".webm", StringComparison.OrdinalIgnoreCase) ||
-                    preview.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase))
+                    preview.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase) ||
+                    preview.EndsWith(".gif", StringComparison.OrdinalIgnoreCase))
                 {
                     continue;
                 }
