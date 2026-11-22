@@ -38,7 +38,7 @@ Write-Host "→ 注册服务 $ServiceName ..." -ForegroundColor Cyan
 if ($LASTEXITCODE -ne 0) { throw "nssm install 失败（$LASTEXITCODE）" }
 
 & $Nssm set $ServiceName AppDirectory (Join-Path $root 'Main\bin')
-& $Nssm set $ServiceName AppParameters "--urls $Url"
+& $Nssm set $ServiceName AppParameters ""
 & $Nssm set $ServiceName AppEnvironmentExtra "GENKAN_ROOT=$root"
 & $Nssm set $ServiceName DisplayName '玄关 Genkan'
 & $Nssm set $ServiceName Description '个人站点门户：玄关。http://localhost:8080'
