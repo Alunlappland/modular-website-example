@@ -24,6 +24,7 @@
 | 命令提示 | `/console` | 查命令用法（ssh、端口、同步、压缩…），**只给提示、不执行**；`/api/console/hints` 可给别处调用 |
 | 路由与挂载 | `/admin/routes` | 增删挂载（static / iframe / link），**仅本机可改**，保存即生效 |
 | 关于 | `/about` | 就是本文件 |
+| 图墙 | `/gallery` | 瀑布流 + 无限滚动；只接 SFW 图源（konachan.net safe / safebooru），服务端代理取图 |
 | 笔记 | `/notes` | 自己的 .md：网页里写、导入已有文件，存在 `Main\document\notes`，拷走就能用 |
 | 剪贴板 | `/clip` | 跨设备存一段文字，手机上复制、电脑上再点一下 |
 | 代理站长 | `/steward` | AI 助手：查体检、读写笔记、读博客、存草稿、看文件、塞剪贴板；不碰删除与恢复 |

@@ -1,0 +1,34 @@
+@page "/gallery"
+@model Genkan.Pages.GalleryModel
+@{
+    ViewData["Title"] = "图墙";
+}
+<link rel="stylesheet" href="/assets/css/gallery.css" asp-append-version="true" />
+
+<section class="gallery-page" id="gallery"
+         data-tags="@Model.Tags" data-provider="@Model.Provider">
+    <header class="gallery-head">
+        <div>
+            <p class="eyebrow">GALLERY</p>
+            <h1>图墙</h1>
+            <p class="muted small">只从 SFW 图源拉取（@Model.ProviderLabel · @Model.Tags）。往下滚会自动加载。</p>
+        </div>
+        <form method="get" class="gallery-search">
+            <input name="tags" value="@Model.Tags" placeholder="标签，比如 landscape / 风景" autocomplete="off" />
+            <button class="btn" type="submit">换一批</button>
+        </form>
+    </header>
+
+    <div class="gallery-flow" id="gallery-flow"></div>
+
+    <p class="muted small gallery-status" id="gallery-status">准备加载…</p>
+    <div class="gallery-sentinel" id="gallery-sentinel" aria-hidden="true"></div>
+</section>
+
+<div class="gallery-lightbox" id="gallery-lightbox" hidden>
+    <button class="gallery-close" type="button" id="gallery-close" aria-label="关闭">×</button>
+    <img id="gallery-large" alt="" />
+    <p class="gallery-caption" id="gallery-caption"></p>
+</div>
+
+<script src="/assets/js/gallery.js" asp-append-version="true"></script>

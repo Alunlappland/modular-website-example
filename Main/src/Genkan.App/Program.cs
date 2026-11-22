@@ -11,6 +11,7 @@ using Genkan.Clip;
 using Genkan.Console;
 using Genkan.Data;
 using Genkan.Files;
+using Genkan.Gallery;
 using Genkan.Notes;
 using Genkan.Security;
 using Genkan.Steward;
@@ -117,9 +118,15 @@ builder.Services.AddSingleton<AiService>();
 builder.Services.AddSingleton<ChatStore>();
 
 // 代理站长（AI 工具调用）
+builder.Services.AddSingleton<GalleryService>();
 builder.Services.AddSingleton<StewardKnowledge>();
 builder.Services.AddSingleton<StewardService>();
 builder.Services.AddHttpClient("ai", client => client.Timeout = TimeSpan.FromMinutes(5));
+builder.Services.AddHttpClient("gallery", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(20);
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("Genkan/1.0 (personal site)");
+});
 
 // 二次验证与临时提权
 builder.Services.AddSingleton<ElevationService>();
@@ -464,6 +471,24 @@ app.MapPost("/api/ai/keys", (AiKeyRequest request, AiService ai, HttpContext con
 
         ai.SaveKey(request.ProviderId, request.Key);
         return Results.Ok(new { ok = true });
+    })
+    .RequireAuthorization();
+
+// ---------- 图墙：SFW 图源代理 ----------
+app.MapGet("/api/gallery", async (int? page, string? tags, GalleryService gallery, CancellationToken cancellationToken) =>
+        Results.Ok(await gallery.FetchAsync(page ?? 1, tags, cancellationToken)))
+    .RequireAuthorization();
+
+app.MapGet("/api/gallery/image", async (string url, GalleryService gallery, HttpContext context, CancellationToken cancellationToken) =>
+    {
+        var result = await gallery.ProxyImageAsync(url, cancellationToken);
+        if (result is null)
+        {
+            return Results.NotFound();
+        }
+
+        context.Response.Headers.CacheControl = "private, max-age=86400";
+        return Results.File(result.Value.Bytes, result.Value.ContentType);
     })
     .RequireAuthorization();
 
