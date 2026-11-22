@@ -13,6 +13,7 @@ using Genkan.Console;
 using Genkan.Data;
 using Genkan.Files;
 using Genkan.Gallery;
+using Genkan.Network;
 using Genkan.Notes;
 using Genkan.Security;
 using Genkan.Steward;
@@ -257,6 +258,9 @@ app.Use(async (context, next) =>
 });
 
 app.UseAuthentication();
+
+// 同网络优先直连：直连访问过之后，从隧道进来会被 302 到内网地址
+app.UseMiddleware<DirectLinkMiddleware>();
 
 // 首次启动必须先进安装向导
 app.Use(async (context, next) =>
