@@ -117,6 +117,7 @@ builder.Services.AddSingleton<AiService>();
 builder.Services.AddSingleton<ChatStore>();
 
 // 代理站长（AI 工具调用）
+builder.Services.AddSingleton<StewardKnowledge>();
 builder.Services.AddSingleton<StewardService>();
 builder.Services.AddHttpClient("ai", client => client.Timeout = TimeSpan.FromMinutes(5));
 

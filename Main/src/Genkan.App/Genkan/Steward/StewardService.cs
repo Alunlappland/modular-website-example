@@ -28,6 +28,7 @@ public sealed class StewardService
     private readonly BlogService _blog;
     private readonly FileRepository _files;
     private readonly ClipRepository _clips;
+    private readonly StewardKnowledge _knowledge;
 
     public StewardService(
         AiService ai,
@@ -36,7 +37,8 @@ public sealed class StewardService
         NotesService notes,
         BlogService blog,
         FileRepository files,
-        ClipRepository clips)
+        ClipRepository clips,
+        StewardKnowledge knowledge)
     {
         _ai = ai;
         _http = http;
@@ -45,6 +47,7 @@ public sealed class StewardService
         _blog = blog;
         _files = files;
         _clips = clips;
+        _knowledge = knowledge;
     }
 
     public async Task<StewardResult> RunAsync(
@@ -82,7 +85,7 @@ public sealed class StewardService
     {
         var messages = new JsonArray
         {
-            new JsonObject { ["role"] = "system", ["content"] = SystemPrompt },
+            new JsonObject { ["role"] = "system", ["content"] = BuildSystemPrompt() },
         };
 
         foreach (var message in history.TakeLast(12))
@@ -206,7 +209,7 @@ public sealed class StewardService
             {
                 ["model"] = provider.Model,
                 ["max_tokens"] = 4096,
-                ["system"] = SystemPrompt,
+                ["system"] = BuildSystemPrompt(),
                 ["messages"] = messages.DeepClone(),
                 ["tools"] = tools.DeepClone(),
             };
@@ -315,6 +318,12 @@ public sealed class StewardService
             Schema()),
         new("add_clip", "把一段文字存进跨设备剪贴板。",
             Schema(("text", "string", "要保存的文字"))),
+        new("list_docs", "列出项目文档（README、Docs、博客原文、笔记）。",
+            Schema()),
+        new("read_doc", "读取一篇项目文档的全文。",
+            Schema(("name", "string", "文档名，如 README、Docs/PLAN、blog/localhost"))),
+        new("search_docs", "在所有项目文档里按关键词搜索，返回上下文片段。",
+            Schema(("query", "string", "关键词"))),
     };
 
     private static JsonObject Schema(params (string Name, string Type, string Description)[] properties)
@@ -418,6 +427,15 @@ public sealed class StewardService
                     return "已存进剪贴板（" + text.Length + " 字）。";
                 }
 
+                case "list_docs":
+                    return string.Join("\n", _knowledge.Docs().Select(doc => doc.Name));
+
+                case "read_doc":
+                    return _knowledge.Read(Arg("name")) ?? "找不到这篇文档，先用 list_docs 看看有哪些。";
+
+                case "search_docs":
+                    return _knowledge.Search(Arg("query"));
+
                 default:
                     return "没有这个工具：" + name;
             }
@@ -437,7 +455,9 @@ public sealed class StewardService
     private static string Trim(string text)
         => text.Length <= 300 ? text : text[..300];
 
-    private const string SystemPrompt =
+    private string BuildSystemPrompt() => BasePrompt + "\n\n" + _knowledge.BuildProfile();
+
+    private const string BasePrompt =
         "你是「玄关」站点的代理站长，替站长处理日常杂事。规则：\n" +
         "1. 需要事实时先调用工具，不要凭空猜站点状态。\n" +
         "2. 写笔记/写文章用工具，写完告诉站长写了什么。\n" +
