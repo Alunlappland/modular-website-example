@@ -543,3 +543,17 @@ html[data-bg="full"] body.has-bg::before {
 .mdrawer-grid a:active { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .mdrawer-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; }
 @media (min-width: 721px) { .mdrawer { display: none; } }
+
+/* 全局防横向滚动：长串、长代码、长链接都不许把页面撑宽 */
+html, body { max-width: 100%; overflow-x: hidden; }
+pre, code, .clip-text { overflow-wrap: anywhere; }
+
+/* 剪贴板 */
+.clip-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.clip-item { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; background: var(--card-solid); }
+.clip-text {
+  margin: 0 0 8px; white-space: pre-wrap; font-family: inherit;
+  font-size: 13.5px; line-height: 1.6; max-height: 220px; overflow: auto;
+}
+.clip-meta { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.clip-actions { display: flex; align-items: center; gap: 18px; }

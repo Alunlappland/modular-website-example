@@ -63,6 +63,24 @@ public sealed class GenkanDb
             alter.ExecuteNonQuery();
         }
 
+        var clipColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        using (var info = connection.CreateCommand())
+        {
+            info.CommandText = "PRAGMA table_info(clips)";
+            using var reader = info.ExecuteReader();
+            while (reader.Read())
+            {
+                clipColumns.Add(reader.GetString(1));
+            }
+        }
+
+        if (!clipColumns.Contains("pinned"))
+        {
+            using var alter = connection.CreateCommand();
+            alter.CommandText = "ALTER TABLE clips ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0";
+            alter.ExecuteNonQuery();
+        }
+
         if (!columns.Contains("local_path"))
         {
             using var alter = connection.CreateCommand();

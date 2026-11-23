@@ -15,12 +15,27 @@ public class IndexModel : PageModel
 
     public bool IsMember { get; private set; }
 
-    public void OnGet()
+    public string? Query { get; private set; }
+
+    public void OnGet(string? q)
     {
         IsAdmin = User.IsInRole("admin");
         IsMember = IsAdmin || User.IsInRole("member");
 
-        Posts = _blog.All().Where(CanSee).ToList();
+        Query = string.IsNullOrWhiteSpace(q) ? null : q.Trim();
+
+        var posts = _blog.All().Where(CanSee);
+
+        if (Query is not null)
+        {
+            posts = posts.Where(post =>
+                post.Title.Contains(Query, StringComparison.OrdinalIgnoreCase) ||
+                post.Summary.Contains(Query, StringComparison.OrdinalIgnoreCase) ||
+                post.Body.Contains(Query, StringComparison.OrdinalIgnoreCase) ||
+                post.Tags.Any(tag => tag.Contains(Query, StringComparison.OrdinalIgnoreCase)));
+        }
+
+        Posts = posts.ToList();
     }
 
     private bool CanSee(BlogPost post)

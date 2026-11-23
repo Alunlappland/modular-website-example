@@ -8,7 +8,7 @@
     <p class="eyebrow">CLIPBOARD</p>
     <h1>剪贴板</h1>
     <p class="muted">
-        把一段文字存到服务器，手机上复制，电脑上再点一下——不用再给自己发消息。
+        把一段文字存到服务器，手机上复制，电脑上再点一下。内容加密存库，<b>@Model.RetainDays 天</b>后自动过期。
     </p>
 
     @if (!string.IsNullOrEmpty(Model.Message))
@@ -25,12 +25,24 @@
             <span>要存下来的文字</span>
             <textarea asp-for="Text" rows="5" placeholder="链接、命令、一段话……"></textarea>
         </label>
+        <label class="field checkbox">
+            <input asp-for="Pin" type="checkbox" />
+            <span>永久保留（加固，不自动过期）</span>
+        </label>
         <button class="btn" type="submit">存进剪贴板</button>
     </form>
 </section>
 
 <section class="panel" style="margin-top:16px">
-    <div class="panel-head"><span>已保存（@Model.Items.Count）</span></div>
+    <div class="panel-head">
+        <span>已保存（@Model.Items.Count）</span>
+        @if (Model.Items.Count > 0)
+        {
+            <form method="post" asp-page-handler="Clear" onsubmit="return confirm('清空全部 @Model.Items.Count 条？');">
+                <button class="link danger" type="submit">清空全部</button>
+            </form>
+        }
+    </div>
 
     @if (Model.Items.Count == 0)
     {
@@ -43,12 +55,27 @@
             {
                 <li class="clip-item">
                     <pre class="clip-text">@item.Text</pre>
-                    <div class="clip-actions">
-                        <button class="link" type="button" data-copy="@item.Id">复制</button>
-                        <form method="post" asp-page-handler="Delete" onsubmit="return confirm('删除这条？');">
-                            <input type="hidden" name="id" value="@item.Id" />
-                            <button class="link danger" type="submit">删除</button>
-                        </form>
+                    <div class="clip-meta">
+                        @if (item.Pinned)
+                        {
+                            <span class="tag on">永久</span>
+                        }
+                        else
+                        {
+                            <span class="muted small">@Model.DaysLeft(item) 天后过期</span>
+                        }
+                        <span class="clip-actions">
+                            <form method="post" asp-page-handler="Pin">
+                                <input type="hidden" name="id" value="@item.Id" />
+                                <input type="hidden" name="pinned" value="@(item.Pinned ? "false" : "true")" />
+                                <button class="link" type="submit">@(item.Pinned ? "取消加固" : "加固")</button>
+                            </form>
+                            <button class="link" type="button" data-copy="@item.Id">复制</button>
+                            <form method="post" asp-page-handler="Delete" onsubmit="return confirm('删除这条？');">
+                                <input type="hidden" name="id" value="@item.Id" />
+                                <button class="link danger" type="submit">删除</button>
+                            </form>
+                        </span>
                     </div>
                 </li>
             }
