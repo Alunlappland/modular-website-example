@@ -49,6 +49,7 @@
                                     <option value="admin" selected="@(user.Role == "admin")">admin</option>
                                     <option value="member" selected="@(user.Role == "member")">member</option>
                                     <option value="guest" selected="@(user.Role == "guest")">guest</option>
+                                    <option value="viewer" selected="@(user.Role == "viewer")">viewer</option>
                                 </select>
                                 <button class="link" type="submit">保存</button>
                             </form>
@@ -103,6 +104,7 @@
                     <select asp-for="NewRole">
                         <option value="member">member · 日常使用</option>
                         <option value="guest">guest · 只读博客</option>
+                        <option value="viewer">viewer · 只读（不能改任何东西）</option>
                         <option value="admin">admin · 管理员</option>
                     </select>
                 </label>

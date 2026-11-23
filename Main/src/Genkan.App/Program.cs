@@ -263,6 +263,23 @@ app.UseAuthentication();
 // 同网络优先直连：直连访问过之后，从隧道进来会被 302 到内网地址
 app.UseMiddleware<DirectLinkMiddleware>();
 
+// 只读账号：除了退出登录，任何 POST 都不放行
+app.Use(async (context, next) =>
+{
+    if (context.User.Identity?.IsAuthenticated == true &&
+        context.User.IsInRole("viewer") &&
+        HttpMethods.IsPost(context.Request.Method) &&
+        !context.Request.Path.Equals("/logout", StringComparison.OrdinalIgnoreCase))
+    {
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        context.Response.ContentType = "text/plain; charset=utf-8";
+        await context.Response.WriteAsync("这是只读账号，不能提交修改。");
+        return;
+    }
+
+    await next();
+});
+
 // 首次启动必须先进安装向导
 app.Use(async (context, next) =>
 {

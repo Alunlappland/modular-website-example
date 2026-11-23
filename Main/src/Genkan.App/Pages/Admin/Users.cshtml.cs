@@ -197,7 +197,7 @@ public class UsersModel : PageModel
     }
 
     private static string NormalizeRole(string? role)
-        => role is "admin" or "member" or "guest" ? role : "member";
+        => role is "admin" or "member" or "guest" or "viewer" ? role : "member";
 
     private void Load() => Users = _users.List();
 }

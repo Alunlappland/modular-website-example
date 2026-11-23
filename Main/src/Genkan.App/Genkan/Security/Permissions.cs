@@ -22,6 +22,8 @@ public static class Permissions
                 "backup.view",
             },
             ["guest"] = new[] { "blog.read" },
+            // 只读账号：能看不能改（所有 POST 在中间件里统一拦掉）
+            ["viewer"] = new[] { "blog.read", "files.read" },
         };
 
     public static bool Has(ClaimsPrincipal? user, string permission)

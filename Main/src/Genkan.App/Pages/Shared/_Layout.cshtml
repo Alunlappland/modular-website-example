@@ -49,6 +49,13 @@
     @await RenderSectionAsync("Head", required: false)
 </head>
 <body class="app @(hasBackground ? "has-bg" : "")" data-role="@role" style="@bgStyle">
+    @if (authed && User.IsInRole("viewer"))
+    {
+        <div class="direct-hint" style="border-color: var(--line); background: color-mix(in srgb, var(--ink) 5%, transparent);">
+            <span>当前是只读账号：可以浏览，上传/保存/删除等操作会被拒绝。</span>
+        </div>
+    }
+
     @if (directUrl is not null)
     {
         <div class="direct-hint">
