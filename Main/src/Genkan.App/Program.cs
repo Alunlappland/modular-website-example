@@ -11,6 +11,7 @@ using Genkan.Blog;
 using Genkan.Clip;
 using Genkan.Console;
 using Genkan.Data;
+using Genkan.Extend;
 using Genkan.Files;
 using Genkan.Gallery;
 using Genkan.Network;
@@ -104,6 +105,7 @@ if (OperatingSystem.IsWindows())
 }
 builder.Services.AddSingleton<ExtendRegistry>();
 builder.Services.AddSingleton<ExtendStore>();
+builder.Services.AddHostedService<ExtendWatcher>();
 builder.Services.AddSingleton<SysMonitor>();
 builder.Services.AddSingleton<BlogService>();
 builder.Services.AddSingleton<BlogRepository>();

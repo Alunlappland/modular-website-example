@@ -111,6 +111,13 @@ public class RoutesModel : PageModel
         return Page();
     }
 
+    public IActionResult OnPostReload()
+    {
+        _registry.Reload(_paths);
+        Info = "已重新扫描 Extend 目录。";
+        return RedirectToPage();
+    }
+
     public IActionResult OnPostDelete(string id)
     {
         if (_store.Delete(id))

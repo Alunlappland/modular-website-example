@@ -11,7 +11,12 @@
             <p class="eyebrow">ADMIN · 仅本机</p>
             <h1>路由与挂载</h1>
         </div>
-        <p class="admin-hint">经 Cloudflare 隧道访问这里会被直接 403；改完立刻生效，不用重启。</p>
+        <div class="admin-hint">
+            <p>经 Cloudflare 隧道访问这里会被直接 403；改完立刻生效，不用重启。</p>
+            <form method="post" asp-page-handler="Reload" style="margin-top:8px">
+                <button class="btn ghost" type="submit">重新扫描 Extend</button>
+            </form>
+        </div>
     </header>
 
     @if (!string.IsNullOrEmpty(Model.Error))
