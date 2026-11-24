@@ -406,7 +406,7 @@ app.Use(async (context, next) =>
     if (string.Equals(mount.Kind, "iframe", StringComparison.OrdinalIgnoreCase))
     {
         context.Response.ContentType = "text/html; charset=utf-8";
-        await context.Response.WriteAsync(BuildFramePage(mount));
+        await context.Response.WriteAsync(BuildFramePage(mount, context));
         return;
     }
 
@@ -517,6 +517,27 @@ app.MapPost("/api/ai/keys", (AiKeyRequest request, AiService ai, HttpContext con
 
         ai.SaveKey(request.ProviderId, request.Key);
         return Results.Ok(new { ok = true });
+    })
+    .RequireAuthorization();
+
+// ---------- 挂载程序用：当前登录用户 ----------
+app.MapGet("/api/me", (HttpContext context) =>
+    {
+        if (context.User.Identity?.IsAuthenticated != true)
+        {
+            return Results.Unauthorized();
+        }
+
+        var role = context.User.FindFirst(ClaimTypes.Role)?.Value ?? "guest";
+        var permissions = Permissions.Roles.TryGetValue(role, out var granted) ? granted : Array.Empty<string>();
+
+        return Results.Ok(new
+        {
+            name = context.User.Identity?.Name ?? string.Empty,
+            display = context.User.FindFirst("display")?.Value ?? string.Empty,
+            role,
+            permissions,
+        });
     })
     .RequireAuthorization();
 
@@ -1170,11 +1191,24 @@ static string Fingerprint(HttpContext context)
     return fingerprint;
 }
 
-static string BuildFramePage(ExtendEntry mount)
+static string BuildFramePage(ExtendEntry mount, HttpContext context)
 {
     var encoder = System.Text.Encodings.Web.HtmlEncoder.Default;
     var title = encoder.Encode(mount.Title);
     var url = encoder.Encode(mount.Url ?? "about:blank");
+
+    // 只对白名单 origin 暴露登录信息，其它站点一律不给
+    var allowed = mount.ExposeUser ? (mount.AllowedOrigin ?? string.Empty) : string.Empty;
+    var userJson = allowed.Length == 0
+        ? "null"
+        : JsonSerializer.Serialize(new
+        {
+            name = context.User.Identity?.Name ?? string.Empty,
+            display = context.User.FindFirst("display")?.Value ?? context.User.Identity?.Name ?? string.Empty,
+            role = context.User.FindFirst(ClaimTypes.Role)?.Value ?? "guest",
+            authenticated = context.User.Identity?.IsAuthenticated == true,
+        });
+    var allowedJson = JsonSerializer.Serialize(allowed);
 
     return $$"""
         <!doctype html>
@@ -1197,7 +1231,33 @@ static string BuildFramePage(ExtendEntry mount)
         </head>
         <body>
           <header><a href="/">← 玄关</a><span>{{title}}</span></header>
-          <iframe src="{{url}}" referrerpolicy="no-referrer"></iframe>
+          <iframe id="gframe" src="{{url}}" referrerpolicy="no-referrer"></iframe>
+          <script>
+            (function () {
+              var frame = document.getElementById('gframe');
+              var allowed = {{allowedJson}};
+              var user = {{userJson}};
+
+              function push() {
+                if (allowed && user && frame.contentWindow) {
+                  frame.contentWindow.postMessage({ type: 'genkan:user', user: user }, allowed);
+                }
+              }
+
+              window.addEventListener('message', function (event) {
+                if (!allowed || event.origin !== allowed) return;
+
+                if (event.data && event.data.type === 'genkan:hello') push();
+
+                if (event.data && event.data.type === 'genkan:open' &&
+                    typeof event.data.path === 'string' && event.data.path.charAt(0) === '/') {
+                  window.location.href = event.data.path;
+                }
+              });
+
+              frame.addEventListener('load', push);
+            })();
+          </script>
         </body>
         </html>
         """;

@@ -203,6 +203,19 @@ public sealed class GenkanDb
 
         CREATE INDEX IF NOT EXISTS ix_backup_started ON backup_runs(started_at);
 
+        CREATE TABLE IF NOT EXISTS api_keys (
+            id           TEXT PRIMARY KEY,
+            owner_id     TEXT NOT NULL,
+            name         TEXT NOT NULL,
+            key_hash     TEXT NOT NULL UNIQUE,
+            scopes       TEXT NOT NULL,
+            created_at   TEXT NOT NULL,
+            last_used_at TEXT,
+            revoked_at   TEXT
+        );
+
+        CREATE INDEX IF NOT EXISTS ix_api_keys_owner ON api_keys(owner_id);
+
         CREATE TABLE IF NOT EXISTS clips (
             id          TEXT PRIMARY KEY,
             owner       TEXT NOT NULL,

@@ -13,7 +13,9 @@ public sealed record ExtendEntry(
     bool Enabled,
     string Directory,
     int Order,
-    string? Url);
+    string? Url,
+    string? AllowedOrigin = null,
+    bool ExposeUser = false);
 
 /// <summary>
 /// 扫描 <c>Extend\*\extend.json</c>，把磁盘上的挂载清单读进内存。
@@ -107,7 +109,9 @@ public sealed class ExtendRegistry
                     Enabled: Bool("enabled", true),
                     Directory: dir,
                     Order: Int("order", 100),
-                    Url: string.IsNullOrWhiteSpace(Str("url")) ? null : Str("url")));
+                    Url: string.IsNullOrWhiteSpace(Str("url")) ? null : Str("url"),
+                    AllowedOrigin: string.IsNullOrWhiteSpace(Str("allowedOrigin")) ? null : Str("allowedOrigin").TrimEnd('/'),
+                    ExposeUser: Bool("exposeUser", false)));
 
                 _logger.LogInformation("发现挂载物 {Id} → {Route}（{Kind}）", id, route, kind);
             }
