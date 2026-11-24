@@ -1,0 +1,103 @@
+@page
+@model Genkan.Pages.Admin.KeysModel
+@{
+    ViewData["Title"] = "API Key";
+}
+<link rel="stylesheet" href="/assets/css/admin.css" asp-append-version="true" />
+
+<section class="admin">
+    <header class="admin-head">
+        <div>
+            <p class="eyebrow">ADMIN · 仅本机</p>
+            <h1>API Key</h1>
+        </div>
+        <p class="admin-hint">给第三方前端或附属程序用。密钥只显示一次，吊销立即失效。</p>
+    </header>
+
+    @if (!string.IsNullOrEmpty(Model.Error))
+    {
+        <div class="alert">@Model.Error</div>
+    }
+    @if (!string.IsNullOrEmpty(Model.Message))
+    {
+        <div class="notice">@Model.Message</div>
+    }
+    @if (!string.IsNullOrEmpty(Model.CreatedKey))
+    {
+        <div class="notice">
+            <p>新密钥（只显示这一次）：</p>
+            <p><code style="word-break: break-all;">@Model.CreatedKey</code></p>
+        </div>
+    }
+
+    <div class="admin-table-wrap">
+        <table class="admin-table">
+            <thead>
+                <tr><th>名称</th><th>权限</th><th>创建</th><th>最近使用</th><th>状态</th><th>操作</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var key in Model.Keys)
+                {
+                    <tr>
+                        <td>@key.Name</td>
+                        <td><code>@key.Scopes</code></td>
+                        <td>@(DateTimeOffset.TryParse(key.CreatedAt, out var created) ? created.ToLocalTime().ToString("MM-dd HH:mm") : key.CreatedAt)</td>
+                        <td>@(DateTimeOffset.TryParse(key.LastUsedAt, out var used) ? used.ToLocalTime().ToString("MM-dd HH:mm") : "—")</td>
+                        <td>
+                            @if (key.RevokedAt is null)
+                            {
+                                <span class="tag on">有效</span>
+                            }
+                            else
+                            {
+                                <span class="tag off">已吊销</span>
+                            }
+                        </td>
+                        <td class="ops">
+                            @if (key.RevokedAt is null)
+                            {
+                                <form method="post" asp-page-handler="Revoke" onsubmit="return confirm('吊销这个 Key？使用它的程序会立即失效。');">
+                                    <input type="hidden" name="id" value="@key.Id" />
+                                    <button class="link danger" type="submit">吊销</button>
+                                </form>
+                            }
+                        </td>
+                    </tr>
+                }
+                @if (Model.Keys.Count == 0)
+                {
+                    <tr><td colspan="6" class="muted">还没有 Key。</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <section class="admin-form" style="margin-top:18px">
+        <h2>新建 Key</h2>
+        <form method="post" asp-page-handler="Create">
+            <label class="field">
+                <span>名称（给谁用，比如「前端小组」）</span>
+                <input asp-for="Name" autocomplete="off" />
+            </label>
+
+            <div class="field">
+                <span>权限</span>
+                <div class="scope-grid">
+                    @foreach (var scope in Model.AllScopes)
+                    {
+                        <label class="field checkbox">
+                            <input type="checkbox" name="Scopes" value="@scope" />
+                            <span>@scope</span>
+                        </label>
+                    }
+                </div>
+            </div>
+
+            <button class="btn" type="submit">生成 Key</button>
+        </form>
+        <p class="muted small">
+            接口见 <a class="link" href="/developers">/developers</a> 与
+            <a class="link" href="/api/v1/openapi.json">openapi.json</a>。
+        </p>
+    </section>
+</section>

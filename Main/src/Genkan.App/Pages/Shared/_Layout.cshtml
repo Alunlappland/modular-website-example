@@ -134,6 +134,9 @@
                     <a class="snav-link @(here.StartsWith("/admin/users", StringComparison.OrdinalIgnoreCase) ? "is-active" : "")" href="/admin/users">
                         <span class="glyph">☰</span><span>账号管理</span>
                     </a>
+                    <a class="snav-link @(here.StartsWith("/admin/keys", StringComparison.OrdinalIgnoreCase) ? "is-active" : "")" href="/admin/keys">
+                        <span class="glyph">⚿</span><span>API Key</span>
+                    </a>
                     <a class="snav-link @Active("/steward")" href="/steward">
                         <span class="glyph">✧</span><span>代理站长</span>
                     </a>

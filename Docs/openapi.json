@@ -1,0 +1,195 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "玄关 Genkan API",
+    "version": "v1",
+    "description": "个人站点「玄关」的对外接口。同源可用 Cookie 登录态；跨源请用 Authorization: Bearer gk_... 形式的 API Key。"
+  },
+  "servers": [{ "url": "/" }],
+  "components": {
+    "securitySchemes": {
+      "apiKey": { "type": "http", "scheme": "bearer", "description": "gk_ 开头的 API Key" },
+      "cookie": { "type": "apiKey", "in": "cookie", "name": "genkan.auth" }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": { "type": "string" },
+              "message": { "type": "string" }
+            }
+          }
+        }
+      },
+      "BlogSummary": {
+        "type": "object",
+        "properties": {
+          "slug": { "type": "string" },
+          "title": { "type": "string" },
+          "date": { "type": "string", "format": "date-time" },
+          "summary": { "type": "string" },
+          "tags": { "type": "array", "items": { "type": "string" } },
+          "visibility": { "type": "string" },
+          "draft": { "type": "boolean" }
+        }
+      },
+      "Note": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "size": { "type": "integer" },
+          "updatedAt": { "type": "string" }
+        }
+      },
+      "File": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "size": { "type": "integer" },
+          "mime": { "type": "string" },
+          "createdAt": { "type": "string" },
+          "download": { "type": "string" }
+        }
+      },
+      "Clip": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "text": { "type": "string" },
+          "createdAt": { "type": "string" },
+          "pinned": { "type": "boolean" }
+        }
+      }
+    }
+  },
+  "security": [{ "apiKey": [] }, { "cookie": [] }],
+  "paths": {
+    "/api/v1/ping": {
+      "get": {
+        "summary": "健康检查",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "example": { "ok": true, "site": "情绪流形的小屋", "time": "2026-11-24T12:00:00Z", "version": "v1" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me": {
+      "get": {
+        "summary": "当前身份与权限",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "example": { "name": "manifld", "display": "站长", "role": "admin", "permissions": ["*"], "scopes": ["blog.read"] }
+              }
+            }
+          },
+          "401": { "description": "未登录", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/v1/status": {
+      "get": {
+        "summary": "站点状态（数据库、文件数、上次备份）",
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/v1/blog": {
+      "get": {
+        "summary": "文章列表",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "size", "in": "query", "schema": { "type": "integer", "default": 20, "maximum": 100 } },
+          { "name": "q", "in": "query", "schema": { "type": "string" } },
+          { "name": "tag", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "example": { "page": 1, "size": 20, "total": 1, "items": [] }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/blog/{slug}": {
+      "get": {
+        "summary": "单篇文章（含 Markdown 原文）",
+        "parameters": [{ "name": "slug", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "OK" }, "404": { "description": "不存在" } }
+      }
+    },
+    "/api/v1/notes": {
+      "get": { "summary": "笔记列表", "responses": { "200": { "description": "OK" } } }
+    },
+    "/api/v1/notes/{name}": {
+      "get": {
+        "summary": "读笔记原文",
+        "parameters": [{ "name": "name", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "OK" }, "404": { "description": "不存在" } }
+      }
+    },
+    "/api/v1/files": {
+      "get": {
+        "summary": "当前账号的文件列表",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "size", "in": "query", "schema": { "type": "integer", "default": 20, "maximum": 100 } }
+        ],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/v1/files/{id}/content": {
+      "get": {
+        "summary": "下载文件（支持 Range）",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "文件内容" }, "404": { "description": "不存在" } }
+      }
+    },
+    "/api/v1/clips": {
+      "get": { "summary": "剪贴板列表", "responses": { "200": { "description": "OK" } } },
+      "post": {
+        "summary": "写入剪贴板",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": { "text": { "type": "string", "maxLength": 20000 }, "pinned": { "type": "boolean" } },
+                "required": ["text"]
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "OK" }, "403": { "description": "缺 clips.write" } }
+      }
+    },
+    "/api/v1/gallery": {
+      "get": {
+        "summary": "图墙（SFW 图源）",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "source", "in": "query", "schema": { "type": "string", "enum": ["safebooru", "konachan", "wallhaven"] } },
+          { "name": "tags", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "OK" } }
+      }
+    }
+  }
+}

@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using Dapper;
 using Genkan;
+using Genkan.Api;
 using Genkan.Ai;
 using Genkan.Backup;
 using Genkan.Blog;
@@ -121,6 +122,25 @@ builder.Services.AddHostedService<BackupScheduler>();
 builder.Services.AddSingleton<SyncService>();
 builder.Services.AddHttpClient("syncthing", client => client.Timeout = TimeSpan.FromSeconds(3));
 
+// CORS：给第三方前端（跨源）用，白名单在 appsettings 的 api:corsOrigins
+var corsOrigins = builder.Configuration.GetSection("api:corsOrigins").Get<string[]>() ?? Array.Empty<string>();
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("api", policy =>
+    {
+        if (corsOrigins.Length == 0)
+        {
+            policy.WithOrigins("http://localhost:5173");
+        }
+        else
+        {
+            policy.WithOrigins(corsOrigins);
+        }
+
+        policy.AllowAnyHeader().AllowAnyMethod().AllowCredentials();
+    });
+});
+
 // AI：供应商目录、密钥托管、对话文件、余额查询
 builder.Services.AddSingleton<AiCatalog>();
 builder.Services.AddSingleton<AiService>();
@@ -129,6 +149,7 @@ builder.Services.AddSingleton<ChatStore>();
 // 代理站长（AI 工具调用）
 builder.Services.AddSingleton<GalleryService>();
 builder.Services.AddSingleton<GalleryPrefsRepository>();
+builder.Services.AddSingleton<ApiKeyRepository>();
 builder.Services.AddSingleton<StewardKnowledge>();
 builder.Services.AddSingleton<StewardService>();
 // 出网用的 HttpClient：可选走本机代理（.NET 不读 Windows 的代理设置，必须显式给）
@@ -265,7 +286,9 @@ app.Use(async (context, next) =>
     await next();
 });
 
+app.UseCors("api");
 app.UseAuthentication();
+app.Use(ApiEndpoints.ApiKeyAuthentication);
 
 // 同网络优先直连：直连访问过之后，从隧道进来会被 302 到内网地址
 app.UseMiddleware<DirectLinkMiddleware>();
@@ -1166,6 +1189,8 @@ app.MapGet("/theme/background", (HttpContext context, ThemeService theme) =>
         return Results.File(theme.BackgroundPath, theme.ContentType);
     })
     .RequireAuthorization();
+
+app.MapGenkanApi();
 
 app.MapRazorPages();
 

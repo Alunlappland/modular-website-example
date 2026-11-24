@@ -20,13 +20,24 @@ public class DevelopersModel : PageModel
 
     public void OnGet()
     {
-        var file = Path.Combine(_paths.Root, "Docs", "EXTEND-SDK.md");
-        if (!System.IO.File.Exists(file))
+        var files = new[] { "EXTEND-SDK.md", "API.md" };
+        var blocks = new List<BlogBlock>();
+
+        foreach (var name in files)
         {
-            Error = "找不到 Docs/EXTEND-SDK.md。";
+            var file = Path.Combine(_paths.Root, "Docs", name);
+            if (System.IO.File.Exists(file))
+            {
+                blocks.AddRange(_blog.Render(System.IO.File.ReadAllText(file)));
+            }
+        }
+
+        if (blocks.Count == 0)
+        {
+            Error = "Docs/EXTEND-SDK.md 与 Docs/API.md 都不存在。";
             return;
         }
 
-        Blocks = _blog.Render(System.IO.File.ReadAllText(file));
+        Blocks = blocks;
     }
 }

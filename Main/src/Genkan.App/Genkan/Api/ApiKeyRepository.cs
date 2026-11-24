@@ -13,10 +13,11 @@ public static class ApiScopes
     public const string ClipsRead = "clips.read";
     public const string ClipsWrite = "clips.write";
     public const string StatusRead = "status.read";
+    public const string GalleryRead = "gallery.read";
 
     public static readonly string[] All =
     {
-        BlogRead, NotesRead, FilesRead, ClipsRead, ClipsWrite, StatusRead,
+        BlogRead, NotesRead, FilesRead, ClipsRead, ClipsWrite, StatusRead, GalleryRead,
     };
 }
 

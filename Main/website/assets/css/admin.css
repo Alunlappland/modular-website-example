@@ -181,3 +181,6 @@ select {
 }
 .inline-form input { width: 140px; }
 .admin-table .ops { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+
+/* API Key È¨ÏÞÑ¡Ôñ */
+.scope-grid { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 6px; }
