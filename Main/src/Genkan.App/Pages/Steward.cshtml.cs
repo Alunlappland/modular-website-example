@@ -3,6 +3,8 @@ using Genkan.Backup;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
+using Genkan.Security;
+
 namespace Genkan.Pages;
 
 [Authorize(Roles = "admin")]
@@ -32,7 +34,7 @@ public class StewardModel : PageModel
         Providers = _ai.Catalog.Providers.Where(provider => _ai.HasKey(provider.Id)).ToList();
         DefaultProvider = _ai.Catalog.DefaultProvider;
 
-        var owner = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        var owner = CurrentUser.RequireId(User);
         var document = _chats.Load(owner, "steward-main");
         History = document?.Messages ?? new List<ChatMessage>();
     }

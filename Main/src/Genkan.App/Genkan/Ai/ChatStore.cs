@@ -46,7 +46,7 @@ public sealed class ChatStore
         var safe = new string(owner.Where(character => char.IsLetterOrDigit(character) || character is '-' or '_').ToArray());
         if (safe.Length == 0)
         {
-            safe = "unknown";
+            throw new ArgumentException("owner 不能为空，也不能全是非法字符。", nameof(owner));
         }
 
         return Path.Combine(_paths.Data, "chats", safe);

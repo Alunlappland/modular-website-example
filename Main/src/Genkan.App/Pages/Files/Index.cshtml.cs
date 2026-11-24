@@ -79,7 +79,7 @@ public class IndexModel : PageModel
 
     public string? NewLink { get; private set; }
 
-    private string OwnerId => User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+    private string OwnerId => CurrentUser.RequireId(User);
 
     public void OnGet() => Load();
 

@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using System.Security.Claims;
 
+using Genkan.Security;
+
 namespace Genkan.Pages;
 
 [Authorize]
@@ -57,7 +59,7 @@ public class GalleryModel : PageModel
         var isDefault = string.Equals(Tags, _gallery.DefaultTags, StringComparison.OrdinalIgnoreCase);
         if (!string.IsNullOrWhiteSpace(tags) && !isDefault && View == "all")
         {
-            var owner = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+            var owner = CurrentUser.RequireId(User);
             _prefs.RecordHistory(owner, Tags, Source);
         }
     }

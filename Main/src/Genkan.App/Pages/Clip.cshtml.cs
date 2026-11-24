@@ -33,7 +33,7 @@ public class ClipModel : PageModel
 
     public int RetainDays => _clips.RetainDays;
 
-    private string OwnerId => User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+    private string OwnerId => CurrentUser.RequireId(User);
 
     public void OnGet()
     {

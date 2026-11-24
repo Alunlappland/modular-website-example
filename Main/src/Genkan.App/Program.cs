@@ -569,7 +569,7 @@ app.MapGet("/api/me", (HttpContext context) =>
 // ---------- 图墙偏好：收藏 / 屏蔽标签 / 搜索历史 ----------
 app.MapGet("/api/gallery/prefs", (HttpContext context, GalleryPrefsRepository prefs) =>
     {
-        var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        var owner = CurrentUser.RequireId(context.User);
         return Results.Ok(new
         {
             blockedTags = prefs.BlockedTags(owner).Select(row => row.Tag),
@@ -581,7 +581,7 @@ app.MapGet("/api/gallery/prefs", (HttpContext context, GalleryPrefsRepository pr
 
 app.MapGet("/api/gallery/favorites", (HttpContext context, GalleryPrefsRepository prefs) =>
     {
-        var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        var owner = CurrentUser.RequireId(context.User);
         var items = prefs.Favorites(owner).Select(row => new
         {
             id = row.ImageKey,
@@ -603,7 +603,7 @@ app.MapPost("/api/gallery/favorite", (
         GalleryPrefsRepository prefs,
         GalleryService gallery) =>
     {
-        var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        var owner = CurrentUser.RequireId(context.User);
         if (string.IsNullOrWhiteSpace(request.PreviewUrl) || string.IsNullOrWhiteSpace(request.OriginalUrl))
         {
             return Results.BadRequest(new { error = "缺少图片地址。" });
@@ -616,7 +616,7 @@ app.MapPost("/api/gallery/favorite", (
             ImageKey = key,
             PreviewUrl = request.PreviewUrl,
             OriginalUrl = request.OriginalUrl,
-            Source = request.Source ?? "unknown",
+            Source = string.IsNullOrWhiteSpace(request.Source) ? "unlabeled" : request.Source,
             Tags = request.Tags,
             CollectionId = request.CollectionId,
         });
@@ -644,7 +644,7 @@ app.MapPost("/api/gallery/favorite", (
 
 app.MapPost("/api/gallery/favorite/move", (GalleryMoveRequest request, HttpContext context, GalleryPrefsRepository prefs) =>
     {
-        var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        var owner = CurrentUser.RequireId(context.User);
         if (string.IsNullOrWhiteSpace(request.Key))
         {
             return Results.BadRequest(new { error = "缺少 key。" });
@@ -657,7 +657,7 @@ app.MapPost("/api/gallery/favorite/move", (GalleryMoveRequest request, HttpConte
 
 app.MapGet("/api/gallery/favorite/image", (string key, HttpContext context, GalleryPrefsRepository prefs, GalleryService gallery) =>
     {
-        var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        var owner = CurrentUser.RequireId(context.User);
         var row = prefs.FindFavorite(owner, key);
         var path = row is null ? null : gallery.LocalAbsolutePath(row.LocalPath);
         if (path is null)
@@ -672,21 +672,21 @@ app.MapGet("/api/gallery/favorite/image", (string key, HttpContext context, Gall
 
 app.MapDelete("/api/gallery/favorite", (string key, HttpContext context, GalleryPrefsRepository prefs) =>
     {
-        var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        var owner = CurrentUser.RequireId(context.User);
         return Results.Ok(new { ok = prefs.RemoveFavorite(owner, key) });
     })
     .RequireAuthorization();
 
 app.MapGet("/api/gallery/collections", (HttpContext context, GalleryPrefsRepository prefs) =>
     {
-        var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        var owner = CurrentUser.RequireId(context.User);
         return Results.Ok(prefs.Collections(owner).Select(row => new { id = row.Id, name = row.Name, count = row.Count }));
     })
     .RequireAuthorization();
 
 app.MapPost("/api/gallery/collections", (GalleryCollectionRequest request, HttpContext context, GalleryPrefsRepository prefs) =>
     {
-        var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        var owner = CurrentUser.RequireId(context.User);
         var name = (request.Name ?? string.Empty).Trim();
         if (name.Length is < 1 or > 32)
         {
@@ -700,14 +700,14 @@ app.MapPost("/api/gallery/collections", (GalleryCollectionRequest request, HttpC
 
 app.MapDelete("/api/gallery/collections", (string id, HttpContext context, GalleryPrefsRepository prefs) =>
     {
-        var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        var owner = CurrentUser.RequireId(context.User);
         return Results.Ok(new { ok = prefs.DeleteCollection(owner, id) });
     })
     .RequireAuthorization();
 
 app.MapPost("/api/gallery/block", (GalleryTagRequest request, HttpContext context, GalleryPrefsRepository prefs) =>
     {
-        var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        var owner = CurrentUser.RequireId(context.User);
         if (string.IsNullOrWhiteSpace(request.Tag))
         {
             return Results.BadRequest(new { error = "标签是空的。" });
@@ -720,14 +720,14 @@ app.MapPost("/api/gallery/block", (GalleryTagRequest request, HttpContext contex
 
 app.MapDelete("/api/gallery/block", (string tag, HttpContext context, GalleryPrefsRepository prefs) =>
     {
-        var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        var owner = CurrentUser.RequireId(context.User);
         return Results.Ok(new { ok = prefs.UnblockTag(owner, tag) });
     })
     .RequireAuthorization();
 
 app.MapPost("/api/gallery/history", (GalleryHistoryRequest request, HttpContext context, GalleryPrefsRepository prefs) =>
     {
-        var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        var owner = CurrentUser.RequireId(context.User);
         prefs.RecordHistory(owner, request.Query ?? string.Empty, request.Source ?? string.Empty);
         return Results.Ok(new { ok = true });
     })
@@ -745,7 +745,7 @@ app.MapGet("/api/gallery", async (
     {
         if (string.Equals(source, "local", StringComparison.OrdinalIgnoreCase))
         {
-            var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+            var owner = CurrentUser.RequireId(context.User);
             var images = files.ListFiles(owner)
                 .Where(file => IsImageName(file.Name))
                 .Select(file => new
@@ -805,7 +805,7 @@ app.MapPost("/api/steward/chat", async (
             return Results.Forbid();
         }
 
-        var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        var owner = CurrentUser.RequireId(context.User);
         var provider = ai.Catalog.Find(request.ProviderId);
         if (provider is null)
         {
@@ -853,7 +853,7 @@ app.MapDelete("/api/steward/chat", (HttpContext context, ChatStore store) =>
             return Results.Forbid();
         }
 
-        var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        var owner = CurrentUser.RequireId(context.User);
         store.Delete(owner, "steward-main");
         return Results.Ok(new { ok = true });
     })
@@ -861,14 +861,14 @@ app.MapDelete("/api/steward/chat", (HttpContext context, ChatStore store) =>
 
 app.MapGet("/api/ai/chats", (ChatStore store, HttpContext context) =>
     {
-        var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        var owner = CurrentUser.RequireId(context.User);
         return Results.Ok(store.List(owner));
     })
     .RequireAuthorization();
 
 app.MapGet("/api/ai/chats/{id}", (string id, ChatStore store, HttpContext context) =>
     {
-        var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        var owner = CurrentUser.RequireId(context.User);
         var document = store.Load(owner, id);
         return document is null ? Results.NotFound() : Results.Ok(document);
     })
@@ -876,7 +876,7 @@ app.MapGet("/api/ai/chats/{id}", (string id, ChatStore store, HttpContext contex
 
 app.MapGet("/api/ai/chats/{id}/export", (string id, ChatStore store, HttpContext context) =>
     {
-        var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        var owner = CurrentUser.RequireId(context.User);
         var document = store.Load(owner, id);
         if (document is null)
         {
@@ -905,7 +905,7 @@ app.MapGet("/api/ai/chats/{id}/export", (string id, ChatStore store, HttpContext
 
 app.MapDelete("/api/ai/chats/{id}", (string id, ChatStore store, HttpContext context) =>
     {
-        var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        var owner = CurrentUser.RequireId(context.User);
         return store.Delete(owner, id) ? Results.Ok(new { ok = true }) : Results.NotFound();
     })
     .RequireAuthorization();
@@ -917,7 +917,7 @@ app.MapPost("/api/ai/chat", async (
         ChatStore store,
         CancellationToken cancellationToken) =>
     {
-        var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        var owner = CurrentUser.RequireId(context.User);
         var provider = ai.Catalog.Find(request.ProviderId);
 
         if (provider is null)

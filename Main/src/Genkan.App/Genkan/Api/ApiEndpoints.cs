@@ -175,7 +175,7 @@ public static class ApiEndpoints
                 return denied;
             }
 
-            var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+            var owner = CurrentUser.RequireId(context.User);
             var (current, take) = Paging(page, size);
             var list = files.ListFiles(owner);
             var items = list.Skip((current - 1) * take).Take(take).Select(file => new
@@ -198,7 +198,7 @@ public static class ApiEndpoints
                 return denied;
             }
 
-            var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+            var owner = CurrentUser.RequireId(context.User);
             var file = files.ListFiles(owner).FirstOrDefault(item => item.Id == id);
             if (file is null)
             {
@@ -218,7 +218,7 @@ public static class ApiEndpoints
                 return denied;
             }
 
-            var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+            var owner = CurrentUser.RequireId(context.User);
             return Results.Ok(new
             {
                 items = clips.List(owner).Select(row => new { id = row.Id, text = row.Text, createdAt = row.CreatedAt, pinned = row.Pinned }),
@@ -238,7 +238,7 @@ public static class ApiEndpoints
                 return Fail(400, "bad_request", "text 不能为空且不超过 20000 字。");
             }
 
-            var owner = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+            var owner = CurrentUser.RequireId(context.User);
             clips.Add(owner, text, request.Pinned);
             return Results.Ok(new { ok = true });
         });

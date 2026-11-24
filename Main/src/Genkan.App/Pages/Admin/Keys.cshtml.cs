@@ -1,4 +1,5 @@
 using Genkan.Api;
+using Genkan.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -53,7 +54,7 @@ public class KeysModel : PageModel
             return Page();
         }
 
-        var key = _keys.Create(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "unknown", name, scopes);
+        var key = _keys.Create(CurrentUser.RequireId(User), name, scopes);
         TempData["key.created"] = key;
         TempData["key.message"] = "密钥只显示这一次，复制走。";
         return RedirectToPage();

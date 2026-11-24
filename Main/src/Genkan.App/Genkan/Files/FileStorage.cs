@@ -220,7 +220,7 @@ public sealed class FileStorage
     public static string SafeSegment(string? value)
     {
         var cleaned = Regex.Replace(value ?? string.Empty, "[^A-Za-z0-9._-]", "_");
-        return cleaned.Length == 0 ? "unknown" : cleaned;
+        return cleaned.Length == 0 ? "_" : cleaned;
     }
 
     private static string UniqueRelative(string directory, string name)

@@ -305,7 +305,7 @@ public sealed class GalleryService
         var safeOwner = new string(owner.Where(char.IsLetterOrDigit).ToArray());
         if (safeOwner.Length == 0)
         {
-            safeOwner = "unknown";
+            throw new ArgumentException("owner 不能为空。", nameof(owner));
         }
 
         var directory = Path.Combine(_paths.Data, "gallery", safeOwner);

@@ -31,7 +31,7 @@ public static class RateLimiter
 
     public static string ClientKey(HttpContext context, string action)
     {
-        var ip = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        var ip = context.Connection.RemoteIpAddress?.ToString() ?? "no-remote-ip";
         return action + ":" + ip;
     }
 }
