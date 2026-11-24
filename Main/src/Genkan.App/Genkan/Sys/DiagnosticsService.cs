@@ -64,27 +64,35 @@ public sealed class DiagnosticsService
         // 磁盘
         try
         {
-            var mainDrive = new DriveInfo(Path.GetPathRoot(_paths.Root)!);
-            var free = mainDrive.AvailableFreeSpace / 1024.0 / 1024 / 1024;
-            var total = mainDrive.TotalSize / 1024.0 / 1024 / 1024;
-            checks.Add(new DiagnosticCheck(
-                "系统盘",
-                free < 5 ? "warn" : "ok",
-                $"剩余 {free:F1} GB / 共 {total:F0} GB"));
-
-            var repository = _kopia.RepositoryPath();
-            if (!string.IsNullOrWhiteSpace(repository) && Directory.Exists(Path.GetPathRoot(repository) + "\\"))
+            if (OperatingSystem.IsWindows())
             {
-                var repoDrive = new DriveInfo(Path.GetPathRoot(repository)!);
-                var repoFree = repoDrive.AvailableFreeSpace / 1024.0 / 1024 / 1024;
+                var mainDrive = new DriveInfo(Path.GetPathRoot(_paths.Root)!);
+                var free = mainDrive.AvailableFreeSpace / 1024.0 / 1024 / 1024;
+                var total = mainDrive.TotalSize / 1024.0 / 1024 / 1024;
                 checks.Add(new DiagnosticCheck(
-                    "备份盘",
-                    repoFree < 5 ? "warn" : "ok",
-                    $"{repoDrive.Name} 剩余 {repoFree:F1} GB / 共 {repoDrive.TotalSize / 1024.0 / 1024 / 1024:F0} GB · 仓库 {repository}"));
+                    "系统盘",
+                    free < 5 ? "warn" : "ok",
+                    $"剩余 {free:F1} GB / 共 {total:F0} GB"));
             }
             else
             {
-                checks.Add(new DiagnosticCheck("备份盘", "warn", "读不到 kopia 仓库路径"));
+                var drive = new DriveInfo("/");
+                var free = drive.AvailableFreeSpace / 1024.0 / 1024 / 1024;
+                var total = drive.TotalSize / 1024.0 / 1024 / 1024;
+                checks.Add(new DiagnosticCheck(
+                    "根分区",
+                    free < 5 ? "warn" : "ok",
+                    $"剩余 {free:F1} GB / 共 {total:F0} GB"));
+            }
+
+            var repository = _kopia.RepositoryPath();
+            if (!string.IsNullOrWhiteSpace(repository) && Directory.Exists(repository))
+            {
+                checks.Add(new DiagnosticCheck("备份仓库", "ok", repository));
+            }
+            else
+            {
+                checks.Add(new DiagnosticCheck("备份仓库", "warn", "读不到 kopia 仓库路径"));
             }
         }
         catch (Exception ex)

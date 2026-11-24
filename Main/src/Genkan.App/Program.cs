@@ -91,12 +91,17 @@ database.EnsureSchema();
 builder.Services.AddSingleton(paths);
 builder.Services.AddSingleton(database);
 
-// 密钥环固定放在 conf\keys：控制台运行与 LocalSystem 服务都读同一份，
+// 密钥环固定放在 conf/keys：控制台运行与服务账户都读同一份，
 // 否则已加密的仓库密码换个账户就解不开。
-builder.Services.AddDataProtection()
+// DPAPI 只有 Windows 有；Linux/macOS 上用普通文件密钥环（靠目录权限保护）。
+var dataProtection = builder.Services.AddDataProtection()
     .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(paths.Conf, "keys")))
-    .ProtectKeysWithDpapi(protectToLocalMachine: true)
     .SetApplicationName("Genkan");
+
+if (OperatingSystem.IsWindows())
+{
+    dataProtection.ProtectKeysWithDpapi(protectToLocalMachine: true);
+}
 builder.Services.AddSingleton<ExtendRegistry>();
 builder.Services.AddSingleton<ExtendStore>();
 builder.Services.AddSingleton<SysMonitor>();

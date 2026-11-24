@@ -57,3 +57,6 @@ Main/conf/appsettings.json
 Main/bin.failed/
 
 Main/bin.test/
+
+# Linux 交叉发布产物
+Main/dist-linux-*/
